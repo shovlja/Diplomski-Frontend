@@ -1,6 +1,7 @@
 // src/hooks/useWelcomeMessage.ts
 import { useState, useEffect } from 'react';
-import api from '../api/axiosInstance';
+import { http } from "../lib/http";
+
 
 export function useWelcomeMessage() {
   const [message, setMessage] = useState<string | null>(null);
@@ -9,7 +10,7 @@ export function useWelcomeMessage() {
 
   useEffect(() => {
     setLoading(true);
-    api.get('/')
+    http.get('/')
       .then((res) => {
         setMessage(res.data.message);
       })

@@ -10,22 +10,29 @@
     "format": "prettier --write 'src/**/*.{js,jsx,ts,tsx,json,css,md}'",
     "preview": "vite preview",
     "build:css": "tailwindcss -i ./src/index.css -o ./dist/output.css --minify",
-    "start": "vite"
+    "start": "vite",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.2.6",
+    "@fontsource-variable/plus-jakarta-sans": "^5.2.6",
+    "@hookform/resolvers": "^5.2.1",
     "axios": "^1.11.0",
     "react": "^19.1.1",
     "react-devtools": "^6.1.5",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.62.0",
-    "react-router-dom": "^7.8.0",
+    "react-router-dom": "^7.8.2",
     "sonner": "^2.0.7",
-    "zod": "^4.0.17"
+    "zod": "^4.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/cli": "^4.1.11",
-    "@tailwindcss/postcss": "^4.1.11",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/postcss": "^4.1.12",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
