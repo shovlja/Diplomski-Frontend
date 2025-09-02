@@ -1,60 +1,68 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { loginUser, getMe } from "./api";
+/* eslint-disable react-refresh/only-export-components */
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useCallback,
+  useState,
+  type ReactNode,
+} from "react";
+import { setAuthHeader } from "@/lib/http";
+import type { AuthUser } from "@/features/auth/types";
 
-type User = { id: number; email: string; display_name: string; is_active?: boolean } | null;
-
-type AuthContextType = {
-  user: User;
+type AuthCtxValue = {
   token: string | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  user: AuthUser | null;
+  // login sada PRIMA token i user
+  login: (token: string, user: AuthUser) => void;
   logout: () => void;
-  restore: () => Promise<void>;
+  setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
 };
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthCtxValue | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem("access_token"));
-  const [user, setUser] = useState<User>(null);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const bootToken =
+    typeof window !== "undefined" ? localStorage.getItem("pmhub_token") : null;
 
-  const restore = async () => {
-    const t = localStorage.getItem("access_token");
-    if (!t) return;
+  const [token, setToken] = useState<string | null>(bootToken);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  // Podigni auth header ako smo imali token iz localStorage-a
+  if (bootToken) setAuthHeader(bootToken);
+
+  const login = useCallback((newToken: string, me: AuthUser) => {
+    setToken(newToken);
+    setUser(me);
     try {
-      const me = await getMe();
-      setUser(me);
+      localStorage.setItem("pmhub_token", newToken);
     } catch {
-      localStorage.removeItem("access_token");
-      setToken(null);
-      setUser(null);
+      // ignore storage errors (private mode / disabled storage)
     }
-  };
+    setAuthHeader(newToken);
+  }, []);
 
-  useEffect(() => { restore(); }, []);
-
-  const login = async (email: string, password: string) => {
-    const data = await loginUser(email, password);
-    localStorage.setItem("access_token", data.access_token);
-    setToken(data.access_token);
-    await restore();
-  };
-
-  const logout = () => {
-    localStorage.removeItem("access_token");
+  const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-  };
+    try {
+      localStorage.removeItem("pmhub_token");
+    } catch {
+      // ignore storage errors
+    }
+    setAuthHeader(null);
+  }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: !!token, login, logout, restore }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthCtxValue>(
+    () => ({ token, user, login, logout, setUser }),
+    [token, user, login, logout],
   );
-};
 
-export const useAuth = () => {
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthCtxValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
-};
+}

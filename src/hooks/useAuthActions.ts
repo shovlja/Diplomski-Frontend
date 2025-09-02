@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { useAuth } from "../features/auth/AuthContext";
-import { registerUser } from "../features/auth/api";
-
-// Define the payload type locally to avoid runtime imports
-type RegisterPayload = {
-  email: string;
-  password: string;
-  display_name: string;
-};
+import { useAuth } from "@/features/auth/AuthContext";
+import {
+  registerUser,
+  loginUser,
+  getMe,
+  type RegisterPayload,
+  type UserDto,
+} from "@/features/auth/api";
+import { setAuthHeader } from "@/lib/http";
 
 export function useAuthActions() {
-  const { login } = useAuth();
+  const { login: setSession } = useAuth();
   const [loading, setLoading] = useState<"login" | "register" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,11 +19,20 @@ export function useAuthActions() {
     setError(null);
     try {
       const { access_token } = await loginUser(email, password);
+
+      // 1) zapamti token i podigni auth header
       localStorage.setItem("pmhub_token", access_token);
-    } catch (e: unknown) {
+      setAuthHeader(access_token);
+
+      // 2) povuci korisnika
+      const me: UserDto = await getMe();
+
+      // 3) u AuthContext upiši sesiju
+      setSession(access_token, me);
+    } catch (e) {
       const msg =
-        (e as any)?.response?.data?.detail ||
-        (e as Error)?.message ||
+        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        (e as Error).message ??
         "Login failed";
       setError(String(msg));
       throw e;
@@ -37,11 +46,11 @@ export function useAuthActions() {
     setError(null);
     try {
       const user = await registerUser(payload);
-      return user; // ← VAŽNO
-    } catch (e: unknown) {
+      return user;
+    } catch (e) {
       const msg =
-        (e as any)?.response?.data?.detail ||
-        (e as Error)?.message ||
+        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        (e as Error).message ??
         "Registration failed";
       setError(String(msg));
       throw e;

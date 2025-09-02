@@ -1,13 +1,8 @@
-// src/components/router/ProtectedRoute.tsx
-import { Navigate } from "react-router-dom";
-import type { ReactNode } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 
-type Props = { children: ReactNode };
-
-export function ProtectedRoute({ children }: Props) {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("pmhub_token") : null;
-
-  if (!token) return <Navigate to="/login" replace />;
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("pmhub_token") : null;
+  const loc = useLocation();
+  if (!token) return <Navigate to="/login" replace state={{ from: loc }} />;
   return <>{children}</>;
 }

@@ -103,7 +103,7 @@ export function RegisterForm() {
       }
 
       toast.success("Account created! Redirecting to sign in…");
-      await new Promise((r) => setTimeout(r, 6000));
+      await new Promise((r) => setTimeout(r, 60));
       window.location.href = "/login";
     } catch (err) {
       toast.error(getErrMessage(err));

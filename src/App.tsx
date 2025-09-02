@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 
 import LoginPage from "./pages/login";
 import RegisterPage from "./pages/register";
+import AppHome from "@/pages/AppHome";
 
 import { ProtectedRoute } from "@/components/router/ProtectedRoute";
 import { RedirectIfAuthed } from "@/components/router/RedirectIfAuthed";
@@ -11,7 +12,7 @@ import { RedirectIfAuthed } from "@/components/router/RedirectIfAuthed";
 function RootIndex() {
   const token =
     (typeof window !== "undefined" && localStorage.getItem("pmhub_token")) || null;
-  return <Navigate to={token ? "/app" : "/login"} replace />;
+  return <Navigate to={token ? "/dashboard" : "/login"} replace />;
 }
 
 export default function App() {
@@ -41,16 +42,16 @@ export default function App() {
 
         {/* Privatno */}
         <Route
-          path="/app"
+          path="/dashboard"
           element={
             <ProtectedRoute>
-              <div className="p-6">Your private app/dashboard goes here.</div>
+              <AppHome />
             </ProtectedRoute>
           }
         />
 
         {/* catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
       <Toaster
