@@ -51,7 +51,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         outline:
           "border border-slate-300 text-slate-800 bg-white hover:bg-slate-50",
         ghost:
-          "text-slate-800 hover:bg-slate-100/70",
+          "hover:bg-accent hover:text-accent-foreground",
         destructive:
           "bg-rose-600 text-white hover:bg-rose-500",
         fullWidth: "w-full",
@@ -61,8 +61,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       sizes: {
         sm: "h-9 px-3 text-sm",
         md: "h-11 px-4 text-[15px]",
-        lg: "h-12 px-5 text-base", // ⬅️ screenshot button height
+        lg: "h-12 px-5 text-base",
+        icon: "h-9 w-9", // ⬅️ screenshot button height
       },
+
+      radius: {
+        default: "",
+        full: "rounded-full",
+        xl: "rounded-xl",
+      },
+      
       variant,
       size,
       flags: { fullWidth, elevated },

@@ -1,28 +1,36 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import LoginPage from "./pages/login";
 import RegisterPage from "./pages/register";
 import AppHome from "@/pages/AppHome";
 
+import Navbar from "@/components/layout/Navbar";
 import { ProtectedRoute } from "@/components/router/ProtectedRoute";
 import { RedirectIfAuthed } from "@/components/router/RedirectIfAuthed";
 
-/** Smart root: ako ima token → /app, inače → /login */
+/** Smart root: ako ima token → /dashboard, inače → /login */
 function RootIndex() {
   const token =
     (typeof window !== "undefined" && localStorage.getItem("pmhub_token")) || null;
   return <Navigate to={token ? "/dashboard" : "/login"} replace />;
 }
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* Root redirect */}
-        <Route path="/" element={<RootIndex />} />
+function AppShell() {
+  const { pathname } = useLocation();
+  const hideNav = pathname === "/login" || pathname === "/register";
 
-        {/* Public (sakrij kad je ulogovan) */}
+  const onLogout = () => {
+    localStorage.removeItem("pmhub_token");
+    window.location.href = "/login";
+  };
+
+  return (
+    <>
+      {!hideNav && <Navbar onLogout={onLogout} />}
+
+      <Routes>
+        <Route path="/" element={<RootIndex />} />
         <Route
           path="/login"
           element={
@@ -39,8 +47,6 @@ export default function App() {
             </RedirectIfAuthed>
           }
         />
-
-        {/* Privatno */}
         <Route
           path="/dashboard"
           element={
@@ -49,29 +55,18 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* catch-all */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
-      <Toaster
-        position="top-right"
-        theme="light"
-        richColors
-        closeButton
-        duration={3500}
-        toastOptions={{
-          classNames: {
-            toast:
-              "rounded-xl border border-white/30 bg-white/80 backdrop-blur-md shadow-lg text-slate-900",
-            description: "text-slate-600",
-            actionButton:
-              "rounded-lg px-3 py-1 font-medium bg-[color:var(--accent-on-dark,#0EA5E9)] text-white hover:brightness-95",
-            cancelButton:
-              "rounded-lg px-3 py-1 font-medium border border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
-          },
-        }}
-      />
+      <Toaster position="top-right" theme="light" richColors visibleToasts={1}  duration={2500}/>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
     </BrowserRouter>
   );
 }

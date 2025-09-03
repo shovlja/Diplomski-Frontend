@@ -5,9 +5,14 @@
 
 /* full-height i bez margine */
 @layer base {
+  :root {
+    --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  }
   html, body, #root { height: 100%; }
-  body { margin: 0;  @apply font-sans antialiased;}
+  body { margin: 0; font-family: var(--font-sans); } /* umesto @apply font-sans */
 }
+
 
 /* DEFAULT PALETA (ovde izaberi boje koje želiš kao podrazumevane) */
 :root {
