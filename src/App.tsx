@@ -1,36 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import LoginPage from "./pages/login";
 import RegisterPage from "./pages/register";
 import AppHome from "@/pages/AppHome";
 
-import Navbar from "@/components/layout/Navbar";
 import { ProtectedRoute } from "@/components/router/ProtectedRoute";
 import { RedirectIfAuthed } from "@/components/router/RedirectIfAuthed";
+import AppLayout from "@/components/layout/AppLayout";
 
-/** Smart root: ako ima token → /dashboard, inače → /login */
-function RootIndex() {
-  const token =
-    (typeof window !== "undefined" && localStorage.getItem("pmhub_token")) || null;
-  return <Navigate to={token ? "/dashboard" : "/login"} replace />;
-}
-
-function AppShell() {
-  const { pathname } = useLocation();
-  const hideNav = pathname === "/login" || pathname === "/register";
-
-  const onLogout = () => {
-    localStorage.removeItem("pmhub_token");
-    window.location.href = "/login";
-  };
-
+export default function App() {
   return (
     <>
-      {!hideNav && <Navbar onLogout={onLogout} />}
-
       <Routes>
-        <Route path="/" element={<RootIndex />} />
+        {/* Public */}
         <Route
           path="/login"
           element={
@@ -47,26 +30,25 @@ function AppShell() {
             </RedirectIfAuthed>
           }
         />
+
+        {/* Protected root "/" (Navbar + Sidebar u AppLayout) */}
         <Route
-          path="/dashboard"
+          path="/"
           element={
             <ProtectedRoute>
-              <AppHome />
+              <AppLayout />
             </ProtectedRoute>
           }
-        />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        >
+          {/* index = "/" → AppHome sam menja prikaz preko ?v=... */}
+          <Route index element={<AppHome />} />
+        </Route>
+
+        {/* catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      <Toaster position="top-right" theme="light" richColors visibleToasts={1}  duration={2500}/>
+      <Toaster position="top-right" theme="light" richColors visibleToasts={1} duration={2500} />
     </>
-  );
-}
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AppShell />
-    </BrowserRouter>
   );
 }

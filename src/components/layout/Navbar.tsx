@@ -53,7 +53,7 @@ export default function Navbar({ user }: NavbarProps) {
       <div className="mx-2 flex h-14 w-full max-w-none items-center px-2 sm:h-17 sm:px-4">
         {/* LEFT: logo */}
         <div className="flex items-center mr-3">
-          <Link to="/dashboard" className="block select-none" aria-label="Go to dashboard">
+          <Link to="/" className="block select-none" aria-label="Go to dashboard">
             <img src={Logo} alt="PMHub" className="h-10 w-auto" />
           </Link>
         </div>
@@ -75,7 +75,7 @@ export default function Navbar({ user }: NavbarProps) {
 
         {/* RIGHT: bell + user */}
         <div className="ml-3 flex items-center gap-2">
-          <Button variant="ghost" size="icon" rounded="full" aria-label="Notifications" className="hover:bg-zinc-200">
+          <Button variant="ghost" size="icon" rounded="full" aria-label="Notifications" className="hover:bg-zinc-200 cursor-pointer">
             <Bell className="h-5 w-5" />
           </Button>
 
