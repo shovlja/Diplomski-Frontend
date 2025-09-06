@@ -47,7 +47,7 @@ export default function BoardsView() {
         </div>
         <Button
             asChild
-            className="inline-flex h-9 gap-1 whitespace-nowrap px-5"
+            className="inline-flex h-9 gap-1 whitespace-nowrap px-5" rounded="full"
         >
             <Link to="/boards/new">
             
@@ -83,8 +83,7 @@ export default function BoardsView() {
             <p className="mb-4 text-sm text-zinc-600">Try adjusting your search or create a new board.</p>
             <Button asChild variant="outline" className="hover:bg-zinc-100">
               <Link to="/boards/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Create board
+                <span className="inline-flex items-center gap-1"><Plus className="h-4 w-4 shrink-0" />Create board</span>
               </Link>
             </Button>
           </div>

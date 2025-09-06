@@ -7,9 +7,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { useAuthActions } from "@/hooks/useAuthActions";
-import { Input } from "@/components/ui/Input";
-import { PasswordInput } from "@/components/ui/PasswordInput";
-import { Button } from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import PasswordInput from "@/components/ui/PasswordInput";
+import Button from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Span } from "@/components/ui/Span";
 
@@ -87,17 +87,11 @@ export function RegisterForm() {
         password: values.password,
       });
 
-      // Lep, čitljiv log (samo u dev okruženju)
       if (import.meta.env.DEV) {
         console.groupCollapsed("%c[REGISTER SUCCESS]", "color:#0EA5E9;font-weight:700");
         if (result && typeof result === "object") {
           console.table(result as Record<string, unknown>);
           console.log("Raw:", JSON.stringify(result, null, 2));
-        } else {
-          console.log(
-            "Registration succeeded. Your hook didn't return a user object. " +
-              "If želiš log, vrati UserOut iz doRegister."
-          );
         }
         console.groupEnd();
       }
@@ -167,12 +161,11 @@ export function RegisterForm() {
                 />
               </div>
 
-              {/* Confirm Password */}
+              {/* Confirm Password — sada takođe PasswordInput sa show/hide */}
               <div className="space-y-1">
                 <Label htmlFor="confirm_password">Confirm Password</Label>
-                <Input
+                <PasswordInput
                   id="confirm_password"
-                  type="password"
                   placeholder="Confirm Password"
                   variant="default"
                   invalid={!!errors.confirm_password}
@@ -187,15 +180,14 @@ export function RegisterForm() {
                 <input
                   type="checkbox"
                   className="mt-[3px] h-4 w-4 rounded border-slate-300
-                             text-[color:var(--accent-on-dark,#0EA5E9)]
-                             focus:ring-[rgba(14,165,233,0.28)]"
+                             text-cyan-500 focus:ring-cyan-200"
                   {...register("terms")}
                 />
                 <Span tone="muted" className="text-sm text-slate-800">
                   I accept the{" "}
-                  <a className="text-[color:var(--accent-on-dark,#0EA5E9)] underline">Terms of Use</a>{" "}
+                  <a className="text-cyan-600 underline">Terms of Use</a>{" "}
                   &{" "}
-                  <a className="text-[color:var(--accent-on-dark,#0EA5E9)] underline">Privacy Policy</a>
+                  <a className="text-cyan-600 underline">Privacy Policy</a>
                 </Span>
               </Label>
 
@@ -204,7 +196,7 @@ export function RegisterForm() {
                 variant="primary"
                 size="lg"
                 fullWidth
-                className="h-12 rounded-md shadow-md shadow-[rgba(14,165,233,0.25)] hover:shadow-[rgba(14,165,233,0.35)]"
+                className="h-12 rounded-md"
                 loading={busy}
                 aria-busy={busy}
                 disabled={busy}
@@ -214,7 +206,7 @@ export function RegisterForm() {
 
               <Span tone="muted" className="text-sm text-slate-800">
                 Already have an account?{" "}
-                <a className="text-[color:var(--accent-on-dark,#0EA5E9)] underline font-medium" href="/login">
+                <a className="text-cyan-600 underline font-medium" href="/login">
                   Sign in
                 </a>
               </Span>

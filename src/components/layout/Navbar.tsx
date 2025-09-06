@@ -49,18 +49,26 @@ export default function Navbar({ user }: NavbarProps) {
   const initials = (displayName || "U").trim().charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 bg-white dark:bg-white shadow-[0_1px_0_rgba(0,0,0,.05),0_8px_24px_rgba(0,0,0,.06)]">
-      <div className="mx-2 flex h-14 w-full max-w-none items-center px-2 sm:h-17 sm:px-4">
+    <header
+      className="
+        fixed inset-x-0 top-0 z-50
+        h-14 sm:h-16
+        bg-white/90 backdrop-blur
+        shadow-[0_1px_0_rgba(0,0,0,.05),0_8px_24px_rgba(0,0,0,.06)]
+        border-b border-zinc-200
+      "
+    >
+      <div className="mx-2 flex h-full w-full items-center px-2 sm:px-4">
         {/* LEFT: logo */}
-        <div className="flex items-center mr-3">
+        <div className="mr-3 flex items-center">
           <Link to="/" className="block select-none" aria-label="Go to dashboard">
             <img src={Logo} alt="PMHub" className="h-10 w-auto" />
           </Link>
         </div>
 
         {/* CENTER: search */}
-        <div className="flex flex-1 justify-end">
-          <div className="relative w-full max-w-[500px] ml-4 sm:ml-6 lg:ml-10">
+        <div className="flex flex-1 justify-end min-w-0">
+          <div className="relative ml-4 w-full max-w-[500px] sm:ml-6 lg:ml-10">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <Input
               variant="outline"
@@ -78,14 +86,10 @@ export default function Navbar({ user }: NavbarProps) {
           <Button variant="ghost" size="icon" rounded="full" aria-label="Notifications" className="hover:bg-zinc-200 cursor-pointer">
             <Bell className="h-5 w-5" />
           </Button>
-
-          <div className="flex items-center gap-1 rounded-full px-1.5 py-1 hover:bg-zinc-200 cursor-pointer select-none">
+          <div className="flex select-none items-center gap-1 rounded-full px-1.5 py-1 hover:bg-zinc-200 cursor-pointer">
             <MiniAvatar src={avatarUrl} alt={displayName} initials={initials} />
-            <div className="hidden ml-2 leading-tight text-left sm:block">
-              <div className="text-sm font-medium text-slate-800 dark:text-slate-800">
-                {displayName}
-              </div>
-              {/* location removed per request */}
+            <div className="ml-2 hidden text-left leading-tight sm:block">
+              <div className="text-sm font-medium text-slate-800">{displayName}</div>
             </div>
           </div>
         </div>

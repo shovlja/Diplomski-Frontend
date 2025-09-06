@@ -1,17 +1,18 @@
 import * as React from "react";
 import { v } from "../../lib/variants";
 
-type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
-type Size = "sm" | "md" | "lg";
+type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive" | "subtle";
+type Size = "sm" | "md" | "lg" | "icon";
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
   fullWidth?: boolean;
   rounded?: "md" | "lg" | "xl" | "2xl" | "full";
-  elevated?: boolean; // nice soft shadow for primary
+  elevated?: boolean;         // default=false
+  /** Ako je true, neće se renderovati <button>, već tvoje dete (npr. <Link>) sa ubrizganim klasama */
+  asChild?: boolean;
 }
 
 const roundedMap: Record<NonNullable<ButtonProps["rounded"]>, string> = {
@@ -30,59 +31,63 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size = "md",
       loading,
       fullWidth,
-      rounded = "md",          // ⬅️ default matches screenshot
-      elevated = variant === "primary",
+      rounded = "md",
+      elevated = false,        // ⬅️ nema više default shadow-a
+      asChild = false,
       children,
-      ...props
+      ...rest
     },
     ref
   ) => {
     const classes = v({
-      base:
-        `inline-flex items-center justify-center select-none font-medium transition
-         focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200
-         disabled:opacity-60 disabled:cursor-not-allowed ${roundedMap[rounded]}`,
+      base: `
+        inline-flex items-center justify-center select-none font-medium transition
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200
+        disabled:opacity-60 disabled:cursor-not-allowed ${roundedMap[rounded]}
+      `,
       variants: {
-        primary:
-        "bg-[color:var(--accent-on-dark,#0EA5E9)] text-white hover:brightness-95 active:translate-y-[0.5px]"
-        ,
-        secondary:
-          "bg-slate-900 text-white hover:bg-slate-800",
-        outline:
-          "border border-slate-300 text-slate-800 bg-white hover:bg-slate-50",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground",
-        destructive:
-          "bg-rose-600 text-white hover:bg-rose-500",
-        fullWidth: "w-full",
-        elevated:
-          "shadow-[0_10px_20px_rgba(139,92,246,0.25)]", // soft violet shadow
+        primary:    "bg-cyan-500 text-white hover:bg-cyan-500/90 active:translate-y-[0.5px]",
+        secondary:  "bg-zinc-900 text-white hover:bg-zinc-800",
+        outline:    "border border-zinc-300 text-zinc-800 bg-white hover:bg-zinc-50",
+        ghost:      "text-zinc-700 hover:bg-zinc-100",
+        destructive:"bg-rose-600 text-white hover:bg-rose-500",
+        subtle:     "bg-zinc-100 text-zinc-800 hover:bg-zinc-200",
+        fullWidth:  "w-full",
+        elevated:   "shadow-md shadow-black/5",
       },
       sizes: {
         sm: "h-9 px-3 text-sm",
         md: "h-11 px-4 text-[15px]",
         lg: "h-12 px-5 text-base",
-        icon: "h-9 w-9", // ⬅️ screenshot button height
+        icon: "h-9 w-9",
       },
-
-      radius: {
-        default: "",
-        full: "rounded-full",
-        xl: "rounded-xl",
-      },
-      
       variant,
       size,
       flags: { fullWidth, elevated },
       className,
     });
 
+    // asChild: renderujemo *dete* (npr. <Link>) umesto <button>
+    if (asChild && React.isValidElement(children)) {
+      const child = React.Children.only(children) as React.ReactElement<any>;
+      // spojimo klase: postojeće sa Button klasama
+      const mergedClass = [child.props.className, classes].filter(Boolean).join(" ");
+      const { onClick, ...domSafe } = rest; // ne guramo button-atribute na <a>
+      return React.cloneElement(child, {
+        ...domSafe,
+        className: mergedClass,
+        // ref ne guramo na <a> kao button ref; ako ti baš treba, koristi forwardRef sa generikom
+        "aria-busy": loading ? "true" : undefined,
+      });
+    }
+
+    // default: pravi <button>
     return (
       <button
         ref={ref}
         className={classes}
         aria-busy={loading ? "true" : "false"}
-        {...props}
+        {...rest}
       >
         {loading ? "Please wait…" : children}
       </button>
@@ -90,3 +95,5 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   }
 );
 Button.displayName = "Button";
+
+export default Button;
