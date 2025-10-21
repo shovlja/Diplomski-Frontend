@@ -6,9 +6,10 @@ import { useAuth } from "@/features/auth/AuthContext";
 import HomeDashboard from "@/pages/views/HomeDashboard";
 import BoardsView from "@/pages/views/BoardsView";
 import AdminUsersView from "@/pages/views/AdminUsersView";
+import EventsView from "@/pages/views/EventsView";
+import TeamsView from "@/pages/views/TeamsView";
 
 // stubovi...
-function TeamsView() { return <div className="p-4">Teams (my teams)</div>; }
 function MyTasksView() { return <div className="p-4">My tasks</div>; }
 function NotificationsView() { return <div className="p-4">Notifications</div>; }
 function InvitesView() { return <div className="p-4">Invitations</div>; }
@@ -21,22 +22,7 @@ function AdminInvites() { return <div className="p-4">System admin • Invitatio
 function AdminLogs() { return <div className="p-4">System admin • Audit logs</div>; }
 function SettingsPage() { return <div className="p-4">System admin • Settings</div>; }
 
-// ⬇️ STUB za events
-function EventsView() {
-  const [sp] = useSearchParams();
-  const dateParam = sp.get("date");
-  return (
-    <div className="mx-auto max-w-[1100px] px-4 sm:px-6 lg:px-8">
-      <h1 className="text-xl font-semibold text-zinc-900">Events</h1>
-      <p className="mt-1 text-sm text-zinc-600">
-        This is a placeholder page for events. {dateParam ? <>Selected date: <code>{dateParam}</code></> : null}
-      </p>
-      <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-        Coming soon…
-      </div>
-    </div>
-  );
-}
+
 
 function ViewGate({ adminOnly, children }: { adminOnly?: boolean; children: React.ReactNode }) {
   const { user } = useAuth();

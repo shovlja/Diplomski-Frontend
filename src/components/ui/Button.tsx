@@ -67,16 +67,17 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       className,
     });
 
-    // asChild: renderujemo *dete* (npr. <Link>) umesto <button>
     if (asChild && React.isValidElement(children)) {
-      const child = React.Children.only(children) as React.ReactElement<any>;
-      // spojimo klase: postojeće sa Button klasama
-      const mergedClass = [child.props.className, classes].filter(Boolean).join(" ");
-      const { onClick, ...domSafe } = rest; // ne guramo button-atribute na <a>
+      const child = React.Children.only(children) as React.ReactElement<Record<string, unknown>>;
+    
+      const mergedClass = [child.props.className as string | undefined, classes]
+        .filter(Boolean)
+        .join(" ");
+    
+      // prosledimo sve iz `rest` – onClick je ok i za <a>/<Link>
       return React.cloneElement(child, {
-        ...domSafe,
+        ...rest,
         className: mergedClass,
-        // ref ne guramo na <a> kao button ref; ako ti baš treba, koristi forwardRef sa generikom
         "aria-busy": loading ? "true" : undefined,
       });
     }

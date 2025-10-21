@@ -1,7 +1,7 @@
 // src/components/ui/home/ClockCalendarCard.tsx
 import * as React from "react";
 import { Link } from "react-router-dom";
-import Button from "@/components/ui/Button";
+import Button from "@/components/ui/Button"; // ili { Button } ako je tvoj export named
 
 type Props = { time: string };
 
@@ -21,21 +21,22 @@ function fmtMonthYear(d: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(d);
 }
 const isSameDay = (a?: Date | null, b?: Date | null) =>
-  !!a &&
-  !!b &&
+  !!a && !!b &&
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
-export default function ClockCalendarCard({ time, heightClass }: { time: string; heightClass?: string }) {
+export default function ClockCalendarCard({ time }: Props) {
   const today = React.useMemo(() => new Date(), []);
   const [view, setView] = React.useState(() => new Date());
+  // selektovan je današnji dan po defaultu
+  const [selected, setSelected] = React.useState<Date | null>(() => new Date());
 
   const first = startOfMonth(view);
   const total = daysInMonth(view);
   const startDay = (first.getDay() + 6) % 7; // Mon=0
 
-  // 6 redova * 7 kolona = 42 ćelije (stabilni key-evi)
+  // stabilni key-evi (6x7=42 ćelije)
   const cells: Array<{ key: string; day: number | null; date?: Date }> = [];
   let cur = 1 - startDay;
   for (let i = 0; i < 42; i++, cur++) {
@@ -48,14 +49,7 @@ export default function ClockCalendarCard({ time, heightClass }: { time: string;
   }
 
   return (
-    <div
-      className="
-        rounded-xl border border-zinc-200 bg-white
-        shadow-[0_1px_0_rgba(0,0,0,.05),0_8px_24px_rgba(0,0,0,.06)]
-        p-4 pb-5 overflow-hidden
-        h-[460px]
-      "
-    >
+    <div className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_0_rgba(0,0,0,.05),0_8px_24px_rgba(0,0,0,.06)] p-4 pb-5 h-[460px]">
       <div className="grid h-full grid-rows-[auto,1fr,auto] gap-4">
         {/* Header */}
         <div>
@@ -87,34 +81,34 @@ export default function ClockCalendarCard({ time, heightClass }: { time: string;
         <div className="select-none">
           <div className="grid grid-cols-7 text-center text-xs text-zinc-500">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div key={`wd-${d}`} className="py-1">
-                {d}
-              </div>
+              <div key={`wd-${d}`} className="py-1">{d}</div>
             ))}
           </div>
 
           <div className="mt-1 grid grid-cols-7 gap-1">
             {cells.map((c) => {
               const isToday = c.date && isSameDay(c.date, today);
+              const isSel = c.date && isSameDay(c.date, selected);
 
-              const base =
-                "h-9 rounded-md border text-sm leading-9 transition text-center";
+              const base = "h-9 rounded-md border text-sm leading-9 transition text-center";
               const valid = "border-zinc-200 bg-white hover:bg-zinc-50";
               const pad = "border-transparent bg-transparent pointer-events-none";
 
-              // SAMO današnji dan naglašen: drugačiji bg + podebljan tekst
-              const todayCls = "bg-cyan-50 font-semibold";
+              const todayCls = "border-cyan-300 bg-cyan-50 text-cyan-700 font-medium";
+              const selCls   = "bg-cyan-500 text-white border-transparent";
 
               return (
                 <button
                   key={c.key}
                   type="button"
                   disabled={!c.date}
-                  onClick={() => {
-                    // ovde i dalje možeš da reaguješ na klik (planiranje itd.)
-                    // npr. open modal / setSelectedDate(c.date)
-                  }}
-                  className={[base, c.day ? valid : pad, isToday ? todayCls : ""].join(" ")}
+                  aria-selected={!!isSel}
+                  onClick={() => c.date && setSelected(c.date)}
+                  className={[
+                    base,
+                    c.day ? valid : pad,
+                    isSel ? selCls : isToday ? todayCls : "",
+                  ].join(" ")}
                 >
                   {c.day ?? ""}
                 </button>
@@ -123,7 +117,7 @@ export default function ClockCalendarCard({ time, heightClass }: { time: string;
           </div>
         </div>
 
-        
+        {/* CTA */}
         <div>
           <Link to="/?v=events" className="block w-full">
             <Button variant="primary" rounded="full" fullWidth className="h-11">

@@ -1,4 +1,4 @@
-import { http } from "@/lib/http";
+import { api } from "@/lib/http";
 import type {
   UsersPage,
   UserRecord,
@@ -12,6 +12,37 @@ import type {
 
 const BASE = "/api/v1/users";
 
+export type UserBrief = {
+  id: string;
+  email: string;
+  display_name: string;
+  avatar_url?: string | null;
+};
+
+export type UsersSearchParams = {
+  q: string;
+  limit?: number;
+};
+
+export async function searchUsersByEmail(
+  q: string,
+  limit = 8
+): Promise<UserBrief[]> {
+  if (!q.trim()) return [];
+  const { data } = await api.get(`/api/v1/users`, {
+    params: {
+      q,
+      status: "active",
+      role: "all",
+      sort: "created_desc",
+      page: 1,
+      page_size: limit,
+    },
+  });
+  // backend vraća { items, total, ... }
+  return (data?.items ?? []) as UserBrief[];
+}
+
 /** Server-side list (paginirano) */
 export async function listUsers(params: {
   q?: string;
@@ -21,7 +52,7 @@ export async function listUsers(params: {
   page?: number;
   page_size?: number;
 }) {
-  const { data } = await http.get<UsersPage>(BASE, { params });
+  const { data } = await api.get<UsersPage>(BASE, { params });
   return data;
 }
 
@@ -49,29 +80,29 @@ export async function listAllUsers(): Promise<UserRecord[]> {
 }
 
 export async function createUser(payload: CreateUserPayload) {
-  const { data } = await http.post<UserRecord>(BASE, payload);
+  const { data } = await api.post<UserRecord>(BASE, payload);
   return data;
 }
 
 export async function updateUser(id: string, payload: UpdateUserPayload) {
-  const { data } = await http.patch<UserRecord>(`${BASE}/${id}`, payload);
+  const { data } = await api.patch<UserRecord>(`${BASE}/${id}`, payload);
   return data;
 }
 
 export async function setUserRole(id: string, role: SystemRole) {
-  const { data } = await http.patch<UserRecord>(`${BASE}/${id}/role`, {
+  const { data } = await api.patch<UserRecord>(`${BASE}/${id}/role`, {
     system_role: role,
   });
   return data;
 }
 
 export async function setUserActive(id: string, is_active: boolean) {
-  const { data } = await http.patch<UserRecord>(`${BASE}/${id}/active`, {
+  const { data } = await api.patch<UserRecord>(`${BASE}/${id}/active`, {
     is_active,
   });
   return data;
 }
 
 export async function deleteUser(id: string) {
-  await http.delete(`${BASE}/${id}`);
+  await api.delete(`${BASE}/${id}`);
 }

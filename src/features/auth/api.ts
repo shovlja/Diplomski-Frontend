@@ -1,6 +1,9 @@
-import { http } from "@/lib/http";
+// src/features/auth/api.ts
+import { api } from "@/lib/http";
+// Ako već imaš svoje user tipove, zadrži ih – ovde izvozimo UserDto za useAuthActions.ts
 
-// payloadi
+const AUTH_PREFIX = "/api/v1/auth";
+
 export type RegisterPayload = {
   display_name: string;
   email: string;
@@ -8,44 +11,41 @@ export type RegisterPayload = {
 };
 
 export type UserDto = {
-  id: string;
-  display_name: string;
+  id: string;                     // UUID
   email: string;
-  system_role?: "USER" | "ADMIN";
-  is_active?: boolean;
+  display_name: string;
   avatar_url?: string | null;
-  created_at?: string;
+  system_role: "ADMIN" | "USER";
+  is_active: boolean;
+  created_at: string;             // ISO
 };
 
-// register → vraća UserOut sa backa
 export async function registerUser(data: RegisterPayload): Promise<UserDto> {
-  const { data: user } = await http.post<UserDto>("/auth/register", data);
+  const { data: user } = await api.post<UserDto>(`${AUTH_PREFIX}/register`, data);
   return user;
 }
 
-// login → vraća token
-export async function loginUser(email: string, password: string): Promise<{
-  access_token: string;
-  token_type: string;
-}> {
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<{ access_token: string; token_type: string }> {
   const form = new URLSearchParams();
-  form.append("username", email);
-  form.append("password", password);
+  form.set("username", email);
+  form.set("password", password);
 
-  const { data } = await http.post<{ access_token: string; token_type: string }>(
-    "/auth/login",
+  const { data } = await api.post<{ access_token: string; token_type: string }>(
+    `${AUTH_PREFIX}/login`,
     form,
     { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
   );
   return data;
 }
 
-// me → vraća UserOut
 export async function getMe(): Promise<UserDto> {
-  const { data } = await http.get<UserDto>("/auth/me");
+  const { data } = await api.get<UserDto>(`${AUTH_PREFIX}/me`);
   return data;
 }
 
 export async function logout(): Promise<void> {
-  await http.post("/auth/logout", {});
+  await api.post(`${AUTH_PREFIX}/logout`, {});
 }

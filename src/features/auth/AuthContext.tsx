@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         /* ignore */
       }
-    } catch (e) {
+    } catch {
       // token nevažeći / istekao / 401 → tretiraj kao logout
       logout();
       return; // logout već radi redirect

@@ -1,6 +1,6 @@
 // src/hooks/useWelcomeMessage.ts
 import { useState, useEffect } from 'react';
-import { http } from "../lib/http";
+import { api } from "../lib/http";
 
 
 export function useWelcomeMessage() {
@@ -10,7 +10,7 @@ export function useWelcomeMessage() {
 
   useEffect(() => {
     setLoading(true);
-    http.get('/')
+    api.get('/')
       .then((res) => {
         setMessage(res.data.message);
       })

@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { Board } from "../types";
+import type { Board } from "@/features/boards/types";
 import { TOKENS } from "@/lib/tokens";
 
 export function useBoardsQuery() {

@@ -1,3 +1,4 @@
+// src/pages/views/HomeDashboard.tsx
 import * as React from "react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useClock } from "@/hooks/useClock";
@@ -10,8 +11,6 @@ import ActivityCard from "@/components/ui/home/ActivityCard";
 import UpcomingCard from "@/components/ui/home/UpcomingCard";
 import ClockCalendarCard from "@/components/ui/home/ClockCalendarCard";
 import { CalendarDays, KanbanSquare, ListTodo, Users2 } from "lucide-react";
-
-const CARD_H = "h-[460px]"; // jedna visina za sve tri kartice
 
 export default function HomeDashboard() {
   const { user } = useAuth();
@@ -46,17 +45,11 @@ export default function HomeDashboard() {
         )}
       </div>
 
-      {/* 3) Activity + Upcoming + ClockCalendar — sve u istom wrapperu i iste visine */}
+      {/* 3) Jedan red – tri kartice iste visine */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className={CARD_H}>
-          <ActivityCard series={activity} barMax={110} className="h-full" />
-        </div>
-
-        <div className={CARD_H}>
-          <UpcomingCard className="h-full" />
-        </div>
-
-        <ClockCalendarCard time={time} heightClass={CARD_H} />
+        <ActivityCard series={activity} />
+        <UpcomingCard />
+        <ClockCalendarCard time={time} />
       </div>
 
       <div className="h-6" />
