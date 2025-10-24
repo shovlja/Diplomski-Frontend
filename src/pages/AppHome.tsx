@@ -8,10 +8,10 @@ import BoardsView from "@/pages/views/BoardsView";
 import AdminUsersView from "@/pages/views/AdminUsersView";
 import EventsView from "@/pages/views/EventsView";
 import TeamsView from "@/pages/views/TeamsView";
+import NotificationsView from "@/pages/views/NotificationsView";
 
 // stubovi...
 function MyTasksView() { return <div className="p-4">My tasks</div>; }
-function NotificationsView() { return <div className="p-4">Notifications</div>; }
 function InvitesView() { return <div className="p-4">Invitations</div>; }
 function SprintsView() { return <div className="p-4">Sprints</div>; }
 function EpicsView() { return <div className="p-4">Epics</div>; }

@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import type { Team, TeamMember, TeamRole } from "@/features/teams/types";
 import { changeMemberRole, removeMember, inviteByEmail, searchUsers } from "@/features/teams/api";
 
+/* --------------------------------- helpers --------------------------------- */
 function initials(displayName?: string | null) {
   const name = (displayName ?? "").trim();
   if (!name) return "U";
@@ -23,9 +24,7 @@ function RoleBadge({ role }: { role: TeamRole }) {
       ? "bg-amber-50 text-amber-700 ring-amber-200"
       : "bg-zinc-100 text-zinc-700 ring-zinc-200";
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${tone}`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${tone}`}>
       {label}
     </span>
   );
@@ -54,17 +53,22 @@ export default function TeamsMembersDialog({ open, onClose, team, onMembersChang
     { id: string; display_name: string; email: string; avatar_url?: string | null }[]
   >([]);
   const [inviting, setInviting] = React.useState(false);
+  const [inviteError, setInviteError] = React.useState<string | null>(null);
+  const [inviteInfo, setInviteInfo] = React.useState<string | null>(null);
 
-  // 🔁 Resetuj search/sugestije svaki put kad se dijalog otvori (ili pređeš na drugi tim)
+  // Reset polja kada se otvori ili promeni tim
   React.useEffect(() => {
     if (open) {
       setInviteEmail("");
       setSuggest([]);
+      setInviteError(null);
+      setInviteInfo(null);
     }
   }, [open, team.id]);
 
+  // Sugestije
   React.useEffect(() => {
-    let done = false;
+    let cancelled = false;
     const q = inviteEmail.trim();
     if (!q || q.length < 2) {
       setSuggest([]);
@@ -73,13 +77,13 @@ export default function TeamsMembersDialog({ open, onClose, team, onMembersChang
     (async () => {
       try {
         const arr = await searchUsers(q, 5);
-        if (!done) setSuggest(arr);
+        if (!cancelled) setSuggest(arr);
       } catch {
-        if (!done) setSuggest([]);
+        if (!cancelled) setSuggest([]);
       }
     })();
     return () => {
-      done = true;
+      cancelled = true;
     };
   }, [inviteEmail]);
 
@@ -108,16 +112,39 @@ export default function TeamsMembersDialog({ open, onClose, team, onMembersChang
     onClose();
   }
 
+  function extractErrorMessage(err: unknown): string {
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object") {
+      const maybe = err as { response?: { data?: { detail?: unknown } } };
+      const detail = maybe.response?.data?.detail;
+      if (typeof detail === "string") return detail;
+    }
+    return (err as Error)?.message ?? "Failed to send invite";
+  }
+
   async function invite() {
     const email = inviteEmail.trim();
     if (!email) return;
     setInviting(true);
+    setInviteError(null);
+    setInviteInfo(null);
     try {
       await inviteByEmail(team.id, email);
       setInviteEmail("");
       setSuggest([]);
+      setInviteInfo("Invitation sent (or already pending).");
+    } catch (err: unknown) {
+      setInviteError(extractErrorMessage(err));
     } finally {
       setInviting(false);
+    }
+  }
+
+  // Enter u polju šalje invite
+  function onInviteKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && !inviting && inviteEmail.trim()) {
+      e.preventDefault();
+      void invite();
     }
   }
 
@@ -137,7 +164,7 @@ export default function TeamsMembersDialog({ open, onClose, team, onMembersChang
       onClick={handleOverlayClick}
       className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4"
     >
-      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4">
           <h2 className="text-xl font-semibold text-zinc-900">Team members</h2>
         </div>
@@ -163,7 +190,7 @@ export default function TeamsMembersDialog({ open, onClose, team, onMembersChang
                   <RoleBadge role={m.role} />
 
                   <details className="relative">
-                    <summary className="list-none rounded-full p-1 hover:bg-black/5">
+                    <summary className="list-none rounded-full p-1 hover:bg-black/5 cursor-pointer">
                       <MoreHorizontal className="h-5 w-5" />
                     </summary>
 
@@ -212,38 +239,60 @@ export default function TeamsMembersDialog({ open, onClose, team, onMembersChang
         </div>
 
         {/* Invite */}
-        <div className="mt-4 flex items-center gap-2">
-          <div className="relative grow">
-            <Input
-              placeholder="Invite by email…"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              rounded="xl"
-            />
-            {suggest.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border bg-white shadow-lg">
-                {suggest.map((u) => (
-                  <button
-                    key={u.id}
-                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50"
-                    onClick={() => setInviteEmail(u.email)}
-                    type="button"
-                  >
-                    <div className="grid h-8 w-8 place-items-center rounded-full bg-zinc-900/90 text-white text-xs">
-                      {initials(u.display_name)}
-                    </div>
-                    <div>
-                      <div className="font-medium text-zinc-900">{u.display_name}</div>
-                      <div className="text-xs text-zinc-500">{u.email}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+        <div className="mt-4">
+          <div className="flex items-center gap-2">
+            <div className="relative grow">
+              <Input
+                placeholder="Invite by email…"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={onInviteKeyDown}
+                rounded="xl"
+              />
+              {suggest.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border bg-white shadow-lg">
+                  {suggest.map((u) => (
+                    <button
+                      key={u.id}
+                      className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50"
+                      onClick={() => setInviteEmail(u.email)}
+                      type="button"
+                    >
+                      <div className="grid h-8 w-8 place-items-center rounded-full bg-zinc-900/90 text-white text-xs">
+                        {initials(u.display_name)}
+                      </div>
+                      <div>
+                        <div className="font-medium text-zinc-900">{u.display_name}</div>
+                        <div className="text-xs text-zinc-500">{u.email}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button
+              className="h-11 rounded-xl px-5"
+              onClick={invite}
+              disabled={inviting || !inviteEmail.trim()}
+            >
+              {inviting ? "Inviting…" : "Invite"}
+            </Button>
           </div>
-          <Button className="h-11 rounded-xl px-5" onClick={invite} disabled={inviting || !inviteEmail.trim()}>
-            {inviting ? "Inviting…" : "Invite"}
-          </Button>
+
+          {inviteError && (
+            <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {inviteError}
+            </div>
+          )}
+          {inviteInfo && !inviteError && (
+            <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              {inviteInfo}
+            </div>
+          )}
+
+          <div className="mt-3 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+            Tip: invites are sent immediately. Members will appear after they accept the invitation.
+          </div>
         </div>
       </div>
     </div>
