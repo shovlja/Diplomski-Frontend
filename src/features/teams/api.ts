@@ -1,6 +1,5 @@
-// src/features/teams/api.ts
 import { api } from "@/lib/http";
-import type { Team, TeamBrief, TeamRole, TeamCreateIn, TeamUpdateIn } from "./types";
+import type { Team, TeamBrief, TeamCreateIn, TeamUpdateIn } from "./types";
 
 // LIST
 export async function listMyTeams(): Promise<TeamBrief[]> {
@@ -23,17 +22,12 @@ export async function createTeam(payload: TeamCreateIn): Promise<Team> {
 // UPDATE
 export async function updateTeam(teamId: number, payload: TeamUpdateIn): Promise<Team> {
   try {
-    // Ne oslanjamo se na response.data (može biti 204 No Content)
     await api.patch(`/api/v1/teams/${teamId}`, payload, {
-      // tretiraj bilo koji 2xx kao uspeh
       validateStatus: (s) => s >= 200 && s < 300,
     });
   } catch {
-    // Čak i ako PATCH baci "Network Error", moguće je da je zapis prošao.
-    // Padaćemo na GET ispod; ako vrati nove podatke, sve je OK.
+    // no-op – uvek radimo GET ispod
   }
-
-  // Uvek povuci sveže detalje i vrati kompletan Team
   const { data } = await api.get(`/api/v1/teams/${teamId}`);
   return data as Team;
 }
@@ -43,14 +37,27 @@ export async function deleteTeam(teamId: number): Promise<void> {
   await api.delete(`/api/v1/teams/${teamId}`);
 }
 
-// MEMBERS – change role
-export async function changeMemberRole(teamId: number, userId: string, role: TeamRole): Promise<void> {
-  await api.patch(`/api/v1/teams/${teamId}/members/${userId}`, { role });
+/**
+ * MEMBERS – change role
+ * Backend očekuje userId kao UUID (string) u path-u:
+ *   PATCH /api/v1/teams/:teamId/members/:userId  body: { role: "developer" | "manager" }
+ */
+export async function changeMemberRole(
+  teamId: number,
+  userId: string | number, // prihvati i number, ali uvek šalji kao string
+  role: "developer" | "manager"
+): Promise<void> {
+  const uid = encodeURIComponent(String(userId)); // ❗️nikad Number(userId)
+  await api.patch(`/api/v1/teams/${teamId}/members/${uid}`, { role });
 }
 
-// MEMBERS – remove / leave
-export async function removeMember(teamId: number, userId: string): Promise<void> {
-  await api.delete(`/api/v1/teams/${teamId}/members/${userId}`);
+/**
+ * MEMBERS – remove / leave
+ * Backend očekuje UUID (string) u path-u.
+ */
+export async function removeMember(teamId: number, userId: string | number): Promise<void> {
+  const uid = encodeURIComponent(String(userId)); // ❗️nikad Number(userId)
+  await api.delete(`/api/v1/teams/${teamId}/members/${uid}`);
 }
 
 // INVITE – by email
@@ -59,7 +66,12 @@ export async function inviteByEmail(teamId: number, email: string): Promise<void
 }
 
 // SEARCH USERS (za sugestije u inviteu)
-export type UserSuggest = { id: string; display_name: string; email: string; avatar_url?: string | null };
+export type UserSuggest = {
+  id: string;
+  display_name: string;
+  email: string;
+  avatar_url?: string | null;
+};
 export async function searchUsers(q: string, limit = 5): Promise<UserSuggest[]> {
   const { data } = await api.get("/api/v1/users", { params: { q, page_size: limit } });
   const items = (data?.items ?? []) as UserSuggest[];
@@ -70,4 +82,3 @@ export async function searchUsers(q: string, limit = 5): Promise<UserSuggest[]> 
     avatar_url: (u.avatar_url ?? null) as string | null,
   }));
 }
-

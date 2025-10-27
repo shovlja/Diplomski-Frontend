@@ -5,6 +5,7 @@ import Input from "@/components/ui/Input";
 import InviteMemberForm from "@/components/ui/teams/InviteMemberForm";
 import { createTeam, inviteByEmail, getTeamDetails } from "@/features/teams/api";
 import type { Team } from "@/features/teams/types";
+import { toast } from "sonner";
 
 type Props = {
   open: boolean;
@@ -61,9 +62,16 @@ export default function CreateTeamDialog({ open, onClose, onCreated }: Props) {
     setBusy(true);
     setError(null);
     try {
-      // napravi tim
-      const raw = await createTeam({ name: n, description: description.trim() || null });
-      // povuci pune detalje (sa članovima) da parent odmah ima konzistentno stanje
+      // isto kao gore: toast.promise ne vraća Team
+      const req = createTeam({ name: n, description: description.trim() || null });
+
+      toast.promise(req, {
+        loading: "Creating team…",
+        success: "Team created.",
+        error: "Failed to create team.",
+      });
+
+      const raw = await req; // ← pravi rezultat createTeam
       const full = await getTeamDetails(raw.id);
       setCreated(full);
     } catch (e: unknown) {
@@ -75,8 +83,12 @@ export default function CreateTeamDialog({ open, onClose, onCreated }: Props) {
 
   async function handleInvite(email: string) {
     if (!created) return;
-    await inviteByEmail(created.id, email);
-    // (opciono) nema trenutnog refresh-a članova (invite je pending) – možeš dodati badge “invited”
+    const req = inviteByEmail(created.id, email);
+    await toast.promise(req, {
+      loading: "Sending invite…",
+      success: `Invitation sent to ${email}.`,
+      error: "Failed to send invite.",
+    });
   }
 
   function finish() {

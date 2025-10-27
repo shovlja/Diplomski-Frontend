@@ -1,8 +1,11 @@
-// src/pages/views/NotificationsView.tsx
 import * as React from "react";
 import { listNotifications, acceptInvite, declineInvite } from "@/features/notifications/api";
 import type { Notification } from "@/features/notifications/types";
-import NotificationCard from "@/components/ui/notifications/NotificationCard";
+import NotificationItem from "@/components/ui/notifications/NotificationItem";
+import { toast } from "sonner";
+
+/** Lokalno proširenje – marker da je pozivnica prihvaćena bez reloada */
+export type LocalNotification = Notification & { __accepted?: boolean };
 
 /* --------------------- Segmented (All / Unread / Actionable) -------------------- */
 type FilterKey = "all" | "unread" | "actionable";
@@ -44,7 +47,7 @@ function SegmentedFilters({
 
 /* ----------------------------------- View ------------------------------------- */
 export default function NotificationsView() {
-  const [items, setItems] = React.useState<Notification[] | null>(null);
+  const [items, setItems] = React.useState<LocalNotification[] | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [filter, setFilter] = React.useState<FilterKey>("all");
@@ -56,7 +59,7 @@ export default function NotificationsView() {
       try {
         setLoading(true);
         const data = await listNotifications();
-        if (!dead) setItems(data);
+        if (!dead) setItems(data as LocalNotification[]);
       } catch (e) {
         if (!dead) setError((e as Error).message);
       } finally {
@@ -72,16 +75,63 @@ export default function NotificationsView() {
   const visible = React.useMemo(() => {
     const arr = items ?? [];
     if (filter === "unread") return arr.filter((n) => !n.is_read);
-    if (filter === "actionable") return arr; // svi su actionable (za sada)
+    if (filter === "actionable") {
+      // actionable = pozivnice koje nisu prihvaćene/odbijene
+      return arr.filter((n) => n.kind === "team_invite" && !n.__accepted);
+    }
     return arr;
   }, [items, filter]);
 
+  // helpers to find notification by id
+  const findById = React.useCallback(
+    (id: number) => (items ?? []).find((x) => x.id === id),
+    [items]
+  );
+
   // actions
-  async function handleAccept(n: Notification) {
+  async function handleAccept(n: LocalNotification) {
+    // 1) optimistic transform
+    setItems((prev) =>
+      prev
+        ? prev.map((x) =>
+            x.id === n.id ? { ...x, __accepted: true, is_read: true } : x
+          )
+        : prev
+    );
+
+    const team = (n as Notification).payload?.team_name ?? "team";
+
+    // 2) server + toast
+    try {
+      await toast.promise(acceptInvite(n.id), {
+        loading: "Accepting invite…",
+        success: `You have joined the team ${team}.`,
+        error: "Failed to accept invite. Please try again.",
+      });
+    } catch {
+      // rollback
+      setItems((prev) =>
+        prev
+          ? prev.map((x) =>
+              x.id === n.id
+                ? { ...x, __accepted: false, is_read: n.is_read }
+                : x
+            )
+          : prev
+      );
+    }
+  }
+
+  async function handleDecline(n: LocalNotification) {
     // optimistic remove
     setItems((prev) => (prev ? prev.filter((x) => x.id !== n.id) : prev));
+
     try {
-      await acceptInvite(n.id);
+      await toast.promise(declineInvite(n.id), {
+        loading: "Declining…",
+        success: "Invite declined.",
+        error: "Failed to decline invite. Please try again.",
+      });
     } catch {
       // rollback
       setItems((prev) =>
@@ -94,20 +144,15 @@ export default function NotificationsView() {
     }
   }
 
-  async function handleDecline(n: Notification) {
-    setItems((prev) => (prev ? prev.filter((x) => x.id !== n.id) : prev));
-    try {
-      await declineInvite(n.id);
-    } catch {
-      setItems((prev) =>
-        prev
-          ? [...prev, n].sort(
-              (a, b) => +new Date(b.created_at) - +new Date(a.created_at)
-            )
-          : prev
-      );
-    }
-  }
+  // wrappers za NotificationItem (ono šalje samo id)
+  const onAcceptById = (id: number) => {
+    const n = findById(id);
+    if (n) void handleAccept(n);
+  };
+  const onDeclineById = (id: number) => {
+    const n = findById(id);
+    if (n) void handleDecline(n);
+  };
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 sm:px-6 lg:px-8">
@@ -142,11 +187,11 @@ export default function NotificationsView() {
       ) : (
         <div className="space-y-3">
           {visible.map((n) => (
-            <NotificationCard
+            <NotificationItem
               key={n.id}
-              notification={n}
-              onAccept={handleAccept}
-              onDecline={handleDecline}
+              data={n}
+              onAccept={onAcceptById}
+              onDecline={onDeclineById}
             />
           ))}
         </div>

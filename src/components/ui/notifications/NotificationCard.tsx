@@ -4,25 +4,79 @@ import { Button } from "@/components/ui/Button";
 import type { Notification } from "@/features/notifications/types";
 import { timeAgo, initials } from "@/features/notifications/time";
 
+/** Lokalno proširenje – marker da je pozivnica prihvaćena */
+type LocalNotification = Notification & { __accepted?: boolean };
+
 type Props = {
-  notification: Notification;
-  onAccept: (n: Notification) => void | Promise<void>;
-  onDecline: (n: Notification) => void | Promise<void>;
+  notification: LocalNotification;
+  onAccept: (n: LocalNotification) => void | Promise<void>;
+  onDecline: (n: LocalNotification) => void | Promise<void>;
 };
 
 export default function NotificationCard({ notification: n, onAccept, onDecline }: Props) {
-  const isInvite = n.kind === "team_invite";
+  const accepted = !!n.__accepted;
   const rel = timeAgo(n.created_at);
 
-  // safe access to payload fields by kind
+  const isInvite = n.kind === "team_invite" && !accepted;
+
   const teamName =
-    n.kind === "team_invite" ? n.payload.team_name : n.payload.team_name;
-  const inviterName =
-    n.kind === "team_invite" ? n.payload.inviter_name || "Someone" : "";
+    n.kind === "team_invite"
+      ? n.payload.team_name
+      : n.kind === "team_joined"
+      ? n.payload.team_name
+      : n.kind === "team_kicked"
+      ? n.payload.team_name
+      : n.kind === "team_role_changed"
+      ? n.payload.team_name
+      : "";
+
+  const inviterName = n.kind === "team_invite" ? n.payload.inviter_name || "Someone" : "";
+
+  function renderText() {
+    switch (n.kind) {
+      case "team_invite":
+        if (!accepted) {
+          return (
+            <>
+              <span className="font-semibold text-zinc-900">{inviterName}</span>{" "}
+              has invited you to join the team{" "}
+              <span className="font-semibold text-zinc-900">{teamName}</span>.
+            </>
+          );
+        }
+        // fallthrough to joined text after accept
+      case "team_joined":
+        return (
+          <>
+            You have joined the team{" "}
+            <span className="font-semibold text-zinc-900">{teamName}</span>.
+          </>
+        );
+      case "team_kicked":
+        return (
+          <>
+            You&apos;ve been kicked from team{" "}
+            <span className="font-semibold text-zinc-900">{teamName}</span>.
+          </>
+        );
+      case "team_role_changed":
+        return (
+          <>
+            Your role in team{" "}
+            <span className="font-semibold text-zinc-900">{teamName}</span>{" "}
+            is now{" "}
+            <span className="font-semibold text-zinc-900">
+              {n.payload.role.charAt(0).toUpperCase() + n.payload.role.slice(1)}
+            </span>.
+          </>
+        );
+      default:
+        return null;
+    }
+  }
 
   return (
     <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-      {/* Left side: avatar (only for invites) + text + actions (inline) */}
       <div className="flex min-w-0 items-center gap-3">
         {isInvite && (
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-zinc-900/90 text-xs font-semibold text-white">
@@ -31,20 +85,7 @@ export default function NotificationCard({ notification: n, onAccept, onDecline 
         )}
 
         <div className="flex min-w-0 items-center gap-3">
-          <div className="truncate text-[15px] text-zinc-700">
-            {isInvite ? (
-              <>
-                <span className="font-semibold text-zinc-900">{inviterName}</span>{" "}
-                has invited you to join the team{" "}
-                <span className="font-semibold text-zinc-900">{teamName}</span>.
-              </>
-            ) : (
-              <>
-                You have joined the team{" "}
-                <span className="font-semibold text-zinc-900">{teamName}</span>.
-              </>
-            )}
-          </div>
+          <div className="truncate text-[15px] text-zinc-700">{renderText()}</div>
 
           {isInvite && (
             <div className="flex flex-none items-center gap-2">
@@ -63,7 +104,6 @@ export default function NotificationCard({ notification: n, onAccept, onDecline 
         </div>
       </div>
 
-      {/* Right side: time ago */}
       <div className="ml-3 flex-none text-xs text-zinc-400">{rel}</div>
     </div>
   );

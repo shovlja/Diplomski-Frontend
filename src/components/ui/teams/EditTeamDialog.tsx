@@ -1,10 +1,10 @@
-// src/components/ui/teams/EditTeamDialog.tsx
 import * as React from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import type { Team } from "@/features/teams/types";
 import { updateTeamAction } from "@/hooks/useTeamsQuery";
+import { toast } from "sonner";
 
 type Props = {
   team: Team;
@@ -62,10 +62,19 @@ export default function EditTeamDialog({ team, open, onClose, onUpdated }: Props
     setBusy(true);
     setError(null);
     try {
-      const next = await updateTeamAction(team.id, {
+      // ❗ important: toast.promise returns a toastId, not the result
+      const req = updateTeamAction(team.id, {
         name: n,
         description: description.trim() || null,
       });
+
+      toast.promise(req, {
+        loading: "Saving…",
+        success: "Team updated.",
+        error: "Failed to update team.",
+      });
+
+      const next = await req; // ← ovo je pravi Team
       onUpdated(next);
       onClose();
     } catch (e: unknown) {

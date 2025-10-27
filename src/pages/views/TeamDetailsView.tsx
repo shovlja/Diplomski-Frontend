@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import InviteMemberForm from "@/components/ui/teams/InviteMemberForm";
 import { useTeamDetailsSimple } from "@/hooks/useTeamsQuery";
 import { inviteByEmail } from "@/features/teams/api";
+import { toast } from "sonner";
 
 export default function TeamDetailsView() {
   const params = useParams();
@@ -23,7 +24,11 @@ export default function TeamDetailsView() {
 
         <InviteMemberForm
           onInvite={async (email) => {
-            await inviteByEmail(teamId, email);
+            await toast.promise(inviteByEmail(teamId, email), {
+              loading: "Sending invite…",
+              success: `Invitation sent to ${email}.`,
+              error: "Failed to send invite.",
+            });
             await refetch();
           }}
         />
