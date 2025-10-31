@@ -1,5 +1,6 @@
+// src/pages/views/TeamsView.tsx
 import * as React from "react";
-import { MoreHorizontal, Users, Search, Star, StarOff } from "lucide-react";
+import { MoreHorizontal, Users, Search, Star, StarOff, AlertTriangle } from "lucide-react";
 import Input from "@/components/ui/Input";
 import TeamMembersDialog from "@/components/ui/teams/TeamsMembersDialog";
 import SkeletonTeamCard from "@/components/ui/teams/SkeletonTeamCard";
@@ -11,6 +12,7 @@ import type { Team, TeamBrief, TeamMember } from "@/features/teams/types";
 import { useTeamStars } from "@/features/teams/starStore";
 import { useAuth } from "@/features/auth/AuthContext";
 import { toast } from "sonner";
+import type { AxiosError } from "axios";
 
 /* ------------------------ Segmented (Boards-like) pills ------------------------ */
 function SegmentedFilters<T extends string>({
@@ -60,7 +62,7 @@ function SearchField({
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
       <Input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.currentTarget.value)}
         placeholder={placeholder ?? "Search…"}
         className="pl-9 pr-3"
         rounded="lg"
@@ -84,10 +86,9 @@ function useOnClickOutside<T extends HTMLElement>(cb: () => void) {
   return ref;
 }
 
-/* ---------- Helpers: members mogu biti samo {id}, ili imati i user_id/role ---------- */
+/* ---------- Helpers ---------- */
 type MaybeId = string | number | undefined;
-const sameId = (a: MaybeId, b: MaybeId) =>
-  a != null && b != null && String(a) === String(b);
+const sameId = (a: MaybeId, b: MaybeId) => a != null && b != null && String(a) === String(b);
 
 type MaybeMember = { id: number } & Partial<{
   user_id: number | string;
@@ -98,6 +99,124 @@ function teamHasOwner(team: TeamBrief, userId: MaybeId): boolean {
   if (userId == null) return false;
   const members = (team.members ?? []) as unknown as MaybeMember[];
   return members.some((m) => sameId(m.user_id, userId) && m.role === "owner");
+}
+
+/* ------------------------------- Lightweight Modal ------------------------------- */
+function ModalBase({
+  open,
+  onClose,
+  children,
+  widthClass = "w-[520px]",
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  widthClass?: string;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[60] flex items-center justify-center"
+      onMouseDown={onClose}
+    >
+      <div className="absolute inset-0 bg-black/30" />
+      <div
+        className={`relative mx-3 rounded-2xl bg-white p-5 shadow-xl ${widthClass}`}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Generic Confirm Dialog ----------------------------- */
+function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmText,
+  confirmTone = "danger",
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  confirmTone?: "danger" | "primary";
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const confirmCls =
+    confirmTone === "danger"
+      ? "bg-rose-600 hover:bg-rose-500"
+      : "bg-cyan-500 hover:bg-cyan-500/90";
+
+  return (
+    <ModalBase open={open} onClose={onCancel}>
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 grid h-9 w-9 place-items-center rounded-full bg-rose-100">
+          <AlertTriangle className="h-5 w-5 text-rose-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
+          <p className="mt-1 text-[15px] leading-6 text-zinc-600 text-justify">{message}</p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              className="cursor-pointer rounded-lg px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+            <button
+              className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-white ${confirmCls}`}
+              onClick={onConfirm}
+            >
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </ModalBase>
+  );
+}
+
+/* ----------------------------- Info (Cannot Delete) ----------------------------- */
+function InfoDialog({
+  open,
+  title,
+  message,
+  onOk,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  onOk: () => void;
+}) {
+  return (
+    <ModalBase open={open} onClose={onOk}>
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 grid h-9 w-9 place-items-center rounded-full bg-amber-100">
+          <AlertTriangle className="h-5 w-5 text-amber-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
+          <p className="mt-1 text-[15px] leading-6 text-zinc-600 text-justify">{message}</p>
+          <div className="mt-4 flex justify-end">
+            <button
+              className="cursor-pointer rounded-lg bg-cyan-500 px-5 py-2 text-sm font-medium text-white hover:bg-cyan-500/90"
+              onClick={onOk}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </ModalBase>
+  );
 }
 
 /* -------------------------------- Team card UI -------------------------------- */
@@ -155,7 +274,7 @@ function TeamCard({
               {/* Edit samo za ownere */}
               {isOwner && (
                 <button
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-zinc-100 cursor-pointer"
+                  className="w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-zinc-100"
                   onClick={() => {
                     setMenuOpen(false);
                     onEdit(t.id);
@@ -165,7 +284,7 @@ function TeamCard({
                 </button>
               )}
               <button
-                className="w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 cursor-pointer"
+                className="w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
                 onClick={() => {
                   setMenuOpen(false);
                   onLeaveOrDelete(t.id, t.name);
@@ -237,6 +356,20 @@ export default function TeamsView() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [selectedTeam, setSelectedTeam] = React.useState<Team | null>(null);
 
+  // delete dialogs (owner)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
+  const [confirmTeamId, setConfirmTeamId] = React.useState<number | null>(null);
+  const [confirmTeamName, setConfirmTeamName] = React.useState<string>("");
+
+  // leave dialogs (non-owner)
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = React.useState(false);
+  const [leaveTeamId, setLeaveTeamId] = React.useState<number | null>(null);
+  const [leaveTeamName, setLeaveTeamName] = React.useState<string>("");
+
+  // info for 409
+  const [infoOpen, setInfoOpen] = React.useState(false);
+  const [infoMsg, setInfoMsg] = React.useState<string>("");
+
   const filtered: TeamBrief[] = React.useMemo(() => {
     const arr = data ?? [];
     const qq = q.trim().toLowerCase();
@@ -262,48 +395,83 @@ export default function TeamsView() {
     setMembersOpen(true);
   }
 
-  // Leave ili Delete u jednom handleru (sa toastovima)
-  async function onLeaveOrDelete(teamId: number, name: string) {
+  // Kebab handler — odlučuje da li ide Delete (owner) ili Leave (member)
+  function onLeaveOrDelete(teamId: number, name: string) {
     const team = (data ?? []).find((t) => t.id === teamId);
     const isOwner = team ? teamHasOwner(team, user?.id) : false;
 
     if (isOwner) {
-      if (!confirm(`Delete team "${name}"?`)) return;
+      setConfirmTeamId(teamId);
+      setConfirmTeamName(name);
+      setConfirmDeleteOpen(true);
+      return;
+    }
 
-      // optimistic remove
-      setData((prev) => (prev ? prev.filter((t) => t.id !== teamId) : prev));
-      try {
-        await toast.promise(deleteTeamAction(teamId), {
-          loading: "Deleting team…",
-          success: `Team "${name}" deleted.`,
-          error: "Failed to delete team.",
-        });
-      } catch {
-        // rollback – refetch bi bio čistije rešenje, ali vraćamo lokalno
-        setData((prev) => (prev ? [...prev, team!].sort((a, b) => a.id - b.id) : prev));
+    setLeaveTeamId(teamId);
+    setLeaveTeamName(name);
+    setConfirmLeaveOpen(true);
+  }
+
+  // Potvrđeno brisanje tima (owner)
+  const confirmDeleteNow = React.useCallback(async () => {
+    setConfirmDeleteOpen(false);
+    if (confirmTeamId == null) return;
+
+    const teamId = confirmTeamId;
+    const teamBefore = (data ?? []).find((t) => t.id === teamId) ?? null;
+
+    // optimistic remove
+    setData((prev) => (prev ? prev.filter((t) => t.id !== teamId) : prev));
+
+    try {
+      await deleteTeamAction(teamId);
+      toast.success(`Team “${confirmTeamName}” deleted.`);
+    } catch (err) {
+      const ax = err as AxiosError<{ detail?: string }>;
+      const status = ax.response?.status ?? 0;
+
+      // rollback
+      if (teamBefore) {
+        setData((prev) => (prev ? [teamBefore, ...prev].sort((a, b) => a.id - b.id) : prev));
       }
-    } else {
-      if (!confirm(`Leave team "${name}"?`)) return;
-      if (user?.id == null) return;
 
-      // optimistic remove from list
-      setData((prev) => (prev ? prev.filter((t) => t.id !== teamId) : prev));
-
-      try {
-        const uid = String(user.id); // API očekuje string
-        await toast.promise(removeMember(teamId, uid), {
-          loading: "Leaving team…",
-          success: `You left "${name}".`,
-          error: "Failed to leave team.",
-        });
-      } catch {
-        // rollback
-        if (team) {
-          setData((prev) => (prev ? [team, ...prev].sort((a, b) => a.id - b.id) : prev));
-        }
+      if (status === 409) {
+        setInfoMsg(
+          `Team “${confirmTeamName}” can’t be deleted because there are boards
+linked to it. Please transfer or delete all boards owned by this team first, then try again.`
+        );
+        setInfoOpen(true);
+      } else {
+        toast.error("Failed to delete team.");
       }
     }
-  }
+  }, [confirmTeamId, confirmTeamName, data, setData]);
+
+  // Potvrđeno napuštanje tima (non-owner)
+  const confirmLeaveNow = React.useCallback(async () => {
+    setConfirmLeaveOpen(false);
+    if (leaveTeamId == null || user?.id == null) return;
+
+    const teamId = leaveTeamId;
+    const teamBefore = (data ?? []).find((t) => t.id === teamId) ?? null;
+
+    // optimistic remove
+    setData((prev) => (prev ? prev.filter((t) => t.id !== teamId) : prev));
+
+    try {
+      const uid = String(user.id);
+      await toast.promise(removeMember(teamId, uid), {
+        loading: "Leaving team…",
+        success: `You left “${leaveTeamName}”.`,
+        error: "Failed to leave team.",
+      });
+    } catch {
+      // rollback
+      if (teamBefore) {
+        setData((prev) => (prev ? [teamBefore, ...prev].sort((a, b) => a.id - b.id) : prev));
+      }
+    }
+  }, [leaveTeamId, leaveTeamName, data, setData, user?.id]);
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
@@ -377,7 +545,7 @@ export default function TeamsView() {
             );
           }}
         />
-     )}
+      )}
 
       {/* Edit dialog */}
       {selectedTeam && (
@@ -413,6 +581,36 @@ export default function TeamsView() {
             prev ? [team as unknown as TeamBrief, ...prev] : [team as unknown as TeamBrief]
           );
         }}
+      />
+
+      {/* Confirm DELETE (owner) */}
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title="Delete team?"
+        message={`You’re about to delete the team “${confirmTeamName}”. This action cannot be undone.`}
+        confirmText="Delete team"
+        confirmTone="danger"
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={confirmDeleteNow}
+      />
+
+      {/* Confirm LEAVE (non-owner) */}
+      <ConfirmDialog
+        open={confirmLeaveOpen}
+        title="Leave team?"
+        message={`You’re about to leave the team “${leaveTeamName}”. You will lose access to its boards and activity.`}
+        confirmText="Leave team"
+        confirmTone="danger"
+        onCancel={() => setConfirmLeaveOpen(false)}
+        onConfirm={confirmLeaveNow}
+      />
+
+      {/* Info dialog for 409 (delete blocked) */}
+      <InfoDialog
+        open={infoOpen}
+        title="Cannot delete team"
+        message={infoMsg}
+        onOk={() => setInfoOpen(false)}
       />
     </div>
   );

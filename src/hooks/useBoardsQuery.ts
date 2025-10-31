@@ -1,66 +1,50 @@
+// src/hooks/useBoardsQuery.ts
 import * as React from "react";
-import type { Board } from "@/features/boards/types";
-import { TOKENS } from "@/lib/tokens";
+import type { Board, FilterKind, SortKind } from "@/features/boards/types";
+import { fetchBoards, toggleStar } from "@/features/boards/api";
 
-export function useBoardsQuery() {
+export function useBoardsQuery(opts: { q: string; filter: FilterKind; sort: SortKind }) {
   const [boards, setBoards] = React.useState<Board[] | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    const t = setTimeout(() => {
-      setBoards([
-        {
-          id: 1,
-          title: "PMHub – Core Roadmap",
-          teamName: "Platform",
-          privacy: "team",
-          isStarred: true,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          cover: `linear-gradient(135deg, ${TOKENS.accent} 0%, rgba(34,211,238,0.15) 100%)`,
-          members: [{ id: 1, name: "Ana Nikolić" }, { id: 2, name: "Petar Šovljanski" }, { id: 3, name: "Milan Jovanović" }],
-        },
-        {
-          id: 2,
-          title: "Marketing Sprint Board",
-          teamName: "Marketing",
-          privacy: "team",
-          isStarred: false,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-          cover: "#f0fdff",
-          members: [{ id: 4, name: "Ivana Petrović" }, { id: 5, name: "Marko Ilić" }],
-        },
-        {
-          id: 3,
-          title: "Personal TODO",
-          privacy: "private",
-          isStarred: true,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString(),
-          cover: "#ecfeff",
-          members: [{ id: 6, name: "Administrator" }],
-        },
-        {
-          id: 4,
-          title: "Design System Tasks",
-          teamName: "Design",
-          privacy: "team",
-          isStarred: false,
-          lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 54).toISOString(),
-          cover: "#f8fafc",
-          members: [
-            { id: 7, name: "Masa K." },
-            { id: 8, name: "Igor R." },
-            { id: 9, name: "Uroš B." },
-            { id: 10, name: "Ema D." },
-          ],
-        },
-      ]);
-    }, 600);
-    return () => clearTimeout(t);
-  }, []);
+  const { q, filter, sort } = opts;
 
-  const toggleStar = React.useCallback((id: number) => {
-    setBoards(prev => prev?.map(b => (b.id === id ? { ...b, isStarred: !b.isStarred } : b)) ?? prev);
-    // TODO: PATCH /boards/:id/star
-  }, []);
+  const load = React.useCallback(async () => {
+    setError(null);
+    try {
+      const data = await fetchBoards({ q, filter, sort });
+      setBoards(data);
+    } catch (e: unknown) {
+      setBoards([]);
+      setError(e instanceof Error ? e.message : "Failed to load boards");
+    }
+  }, [q, filter, sort]);
 
-  return { boards, isLoading: boards === null, toggleStar };
+  React.useEffect(() => { void load(); }, [load]);
+
+  const onToggleStar = React.useCallback(async (id: number) => {
+    // snapshot za rollback
+    let snapshot: Board[] | null = null;
+
+    setBoards(prev => {
+      snapshot = prev ? [...prev] : prev;
+      if (!prev) return prev;
+
+      if (filter === "starred") {
+        // odmah skloni sa liste u Starred tabu
+        return prev.filter(b => b.id !== id);
+      }
+      // u drugim tabovima samo flipuj zvezdicu
+      return prev.map(b => (b.id === id ? { ...b, isStarred: !b.isStarred } : b));
+    });
+
+    try {
+      await toggleStar(id);
+    } catch {
+      // rollback na snapshot ako API padne
+      setBoards(snapshot);
+    }
+  }, [filter]);
+
+  return { boards, isLoading: boards === null, error, reload: load, toggleStar: onToggleStar };
 }

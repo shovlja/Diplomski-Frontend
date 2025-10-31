@@ -1,7 +1,7 @@
 export type BoardPrivacy = "private" | "team" | "public";
 
 export type Member = {
-  id: number;
+  id: number | string;
   name: string;
   avatarUrl?: string;
 };
@@ -12,9 +12,11 @@ export type Board = {
   teamName?: string;
   privacy: BoardPrivacy;
   isStarred: boolean;
-  lastActivity: string; // ISO
-  cover?: string;       // css/hex/gradient
+  lastActivity: string;
+  cover?: string;       
   members: Member[];
+  tags?: string[];
+  isOwner?: boolean;
 };
 
 export type FilterKind = "all" | "mine" | "starred";
