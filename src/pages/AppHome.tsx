@@ -5,6 +5,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 
 import HomeDashboard from "@/pages/views/HomeDashboard";
 import BoardsView from "@/pages/views/BoardsView";
+import BoardView from "@/pages/views/BoardView";
 import AdminUsersView from "@/pages/views/AdminUsersView";
 import EventsView from "@/pages/views/EventsView";
 import TeamsView from "@/pages/views/TeamsView";
@@ -41,6 +42,7 @@ export default function AppHome() {
   switch (v) {
     case "":             return <HomeDashboard />;
     case "boards":       return <BoardsView />;
+    case "board":        return <BoardView />;
     case "teams":        return <TeamsView />;
     case "my-tasks":     return <MyTasksView />;
     case "notifications":return <NotificationsView />;
