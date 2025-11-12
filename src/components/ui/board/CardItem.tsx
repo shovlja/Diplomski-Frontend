@@ -144,9 +144,9 @@ export default function CardItem({ card, isGhost, onOpen, onDragStart, onDragEnd
             <span
               key={m.id}
               className="grid h-6 w-6 place-items-center rounded-full bg-purple-600 text-[10px] font-semibold text-white"
-              title={m.fullName ?? m.id}
+              title={m.display_name ?? m.id}
             >
-              {initials(m.fullName ?? m.id)}
+              {initials(m.display_name ?? m.id)}
             </span>
           ))}
         </div>

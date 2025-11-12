@@ -9,9 +9,19 @@ import CardSection from "./CardSection";
 import ProgressBar from "./ProgressBar";
 import DueBadge from "./DueBadge";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/features/auth/AuthContext";
 import type { Checklist, LabelItem, Member } from "@/features/boards/board";
+import {
+  createChecklist as apiCreateChecklist,
+  addChecklistItem as apiAddChecklistItem,
+  updateChecklistItem as apiUpdateChecklistItem,
+  deleteChecklist as apiDeleteChecklist,
+  createLabel as apiCreateLabel,
+  updateLabel as apiUpdateLabel,
+  deleteLabel as apiDeleteLabel,
+} from "@/features/boards/api";
 
-/* ----------------------------- Local types ----------------------------- */
+/* ---------- helpers ---------- */
 export type CommentItem = { id: string; author: string; createdAt: string; text: string };
 
 export type CardDialogCard = {
@@ -30,6 +40,8 @@ type Props = {
   open: boolean;
   card: CardDialogCard;
   listTitle: string;
+  boardId: number;
+  boardTeamId?: number;
   onClose: () => void;
 
   onSaveTitle?: (value: string) => void;
@@ -39,23 +51,15 @@ type Props = {
   onSaveChecklists?: (lists: Checklist[] | undefined) => void;
   onSaveMembers?: (members: Member[]) => void;
   onSaveComments?: (comments: CommentItem[]) => void;
+
+  /** Board-level katalog; opciono */
+  labelsCatalog?: LabelItem[];
+  onLabelsCatalogChange?: (next: LabelItem[]) => void;
 };
 
-const DEFAULT_LABELS: LabelItem[] = [
-  { id: 1, name: "User Story", color: "#2FB26A", checked: false },
-  { id: 2, name: "Database", color: "#FDB022", checked: false },
-  { id: 3, name: "Frontend", color: "#F97066", checked: false },
-  { id: 4, name: "Design", color: "#F63D68", checked: false },
-  { id: 5, name: "Bug", color: "#12A89E", checked: false },
-  { id: 6, name: "QA", color: "#7A5AF8", checked: false },
-];
-
-function mergeLabels(selected?: LabelItem[]) {
-  const map = new Map<number, LabelItem>();
-  for (const d of DEFAULT_LABELS) map.set(d.id, { ...d, checked: false });
-  for (const s of selected ?? []) map.set(s.id, { ...s, checked: s.checked ?? true });
-  return Array.from(map.values());
-}
+// ⚠️ NEMA freeze (pravio readonly tip)
+const EMPTY_LABELS = [] as LabelItem[]; // stabilna, nemoj je mutirati
+const NOOP = () => {};
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
 const fmtDateTime = (iso: string) => {
@@ -65,10 +69,17 @@ const fmtDateTime = (iso: string) => {
 const initials = (name: string) =>
   name.split(" ").map((p) => p[0]?.toUpperCase() ?? "").slice(0, 2).join("");
 
+function fuseCatalogWithSelected(catalog: LabelItem[], selected?: LabelItem[]): LabelItem[] {
+  const sel = new Set((selected ?? []).map((s) => s.id));
+  return catalog.map((l) => ({ ...l, checked: sel.has(l.id) }));
+}
+
 export default function CardDialog({
   open,
   card,
   listTitle,
+  boardId,
+  boardTeamId,
   onClose,
   onSaveTitle,
   onSaveDescription,
@@ -77,28 +88,35 @@ export default function CardDialog({
   onSaveChecklists,
   onSaveMembers,
   onSaveComments,
+  labelsCatalog: labelsCatalogProp,
+  onLabelsCatalogChange: onLabelsCatalogChangeProp,
 }: Props) {
   const overlayRef = React.useRef<HTMLDivElement>(null);
 
+  const labelsCatalog = labelsCatalogProp ?? EMPTY_LABELS;
+  const onLabelsCatalogChange = onLabelsCatalogChangeProp ?? NOOP;
+
+  const { user } = useAuth();
+  const currentUserName = user?.display_name?.trim() || user?.email?.trim() || "User";
+
   // state
-  const [title, setTitle] = React.useState(card.title);
-  const [labels, setLabels] = React.useState<LabelItem[]>(mergeLabels(card.labels));
+  const [title, setTitle] = React.useState<string>(card.title);
+  const [labelsLocal, setLabelsLocal] = React.useState<LabelItem[]>(
+    fuseCatalogWithSelected(labelsCatalog, card.labels)
+  );
   const [due, setDue] = React.useState<string | null>(card.dueDate ?? null);
   const [dueComplete, setDueComplete] = React.useState<boolean>(!!card.dueComplete);
   const [lists, setLists] = React.useState<Checklist[]>(Array.isArray(card.checklists) ? card.checklists : []);
   const [hidden, setHidden] = React.useState<Record<string, boolean>>({});
   const [members, setMembers] = React.useState<Member[]>(card.members ?? []);
-
-  const [desc, setDesc] = React.useState(card.description ?? "");
-  const [descDraft, setDescDraft] = React.useState(card.description ?? "");
-  const [editingDesc, setEditingDesc] = React.useState(false);
-
+  const [desc, setDesc] = React.useState<string>(card.description ?? "");
+  const [descDraft, setDescDraft] = React.useState<string>(card.description ?? "");
+  const [editingDesc, setEditingDesc] = React.useState<boolean>(false);
   const [comments, setComments] = React.useState<CommentItem[]>(card.comments ?? []);
-  const [commentText, setCommentText] = React.useState("");
+  const [commentText, setCommentText] = React.useState<string>("");
 
-  // comment edit/delete
   const [editingCommentId, setEditingCommentId] = React.useState<string | null>(null);
-  const [commentDraft, setCommentDraft] = React.useState("");
+  const [commentDraft, setCommentDraft] = React.useState<string>("");
   const [delState, setDelState] = React.useState<{ id: string | null; anchor: HTMLElement | null }>({ id: null, anchor: null });
 
   // popover refs
@@ -108,18 +126,16 @@ export default function CardDialog({
   const checklistBtnRef = React.useRef<HTMLButtonElement>(null);
   const membersBtnRef = React.useRef<HTMLButtonElement>(null);
 
-  // koji element je trenutni anchor za Labels popover
   const [labelsAnchor, setLabelsAnchor] = React.useState<"toolbar" | "plus">("toolbar");
+  const [labelsOpen, setLabelsOpen] = React.useState<boolean>(false);
+  const [datesOpen, setDatesOpen] = React.useState<boolean>(false);
+  const [checklistOpen, setChecklistOpen] = React.useState<boolean>(false);
+  const [membersOpen, setMembersOpen] = React.useState<boolean>(false);
 
-  const [labelsOpen, setLabelsOpen] = React.useState(false);
-  const [datesOpen, setDatesOpen] = React.useState(false);
-  const [checklistOpen, setChecklistOpen] = React.useState(false);
-  const [membersOpen, setMembersOpen] = React.useState(false);
-
-  // sync na promeni karte
+  // sync na promenu kartice ILI board kataloga
   React.useEffect(() => {
     setTitle(card.title);
-    setLabels(mergeLabels(card.labels));
+    setLabelsLocal(fuseCatalogWithSelected(labelsCatalog, card.labels));
     setDue(card.dueDate ?? null);
     setDueComplete(!!card.dueComplete);
     setLists(Array.isArray(card.checklists) ? card.checklists : []);
@@ -133,7 +149,7 @@ export default function CardDialog({
     setEditingCommentId(null);
     setCommentDraft("");
     setDelState({ id: null, anchor: null });
-  }, [card]);
+  }, [card, labelsCatalog]);
 
   // zatvaranje klikom na overlay
   React.useEffect(() => {
@@ -148,7 +164,9 @@ export default function CardDialog({
 
   if (!open) return null;
 
-  const selectedLabels = labels.filter((l) => l.checked);
+  const selectedLabels = labelsLocal.filter((l) => l.checked);
+  const labelsAnchorEl: HTMLElement | null =
+    labelsAnchor === "plus" ? labelsPlusBtnRef.current : labelsToolbarBtnRef.current;
 
   const sums = lists.reduce(
     (acc, list) => {
@@ -159,53 +177,17 @@ export default function CardDialog({
     { done: 0, total: 0 }
   );
   const pctAll = sums.total ? Math.round((sums.done / sums.total) * 100) : 0;
+  const allDone = sums.total > 0 && sums.done === sums.total;
 
   function addComment() {
     const text = commentText.trim();
     if (!text) return;
-    const c: CommentItem = { id: crypto.randomUUID(), author: "Petar Šovljanski", createdAt: new Date().toISOString(), text };
+    const c: CommentItem = { id: crypto.randomUUID(), author: currentUserName, createdAt: new Date().toISOString(), text };
     const next = [c, ...comments];
     setComments(next);
     setCommentText("");
     onSaveComments?.(next);
   }
-
-  function startEditComment(id: string, current: string) {
-    setEditingCommentId(id);
-    setCommentDraft(current);
-  }
-
-  function saveEditComment(id: string) {
-    const trimmed = commentDraft.trim();
-    if (!trimmed) return;
-    const next = comments.map((c) => (c.id === id ? { ...c, text: trimmed } : c));
-    setComments(next);
-    setEditingCommentId(null);
-    setCommentDraft("");
-    onSaveComments?.(next);
-  }
-
-  function cancelEditComment() {
-    setEditingCommentId(null);
-    setCommentDraft("");
-  }
-
-  function askDeleteComment(id: string, anchor: HTMLElement | null) {
-    setDelState({ id, anchor });
-  }
-
-  function confirmDeleteComment() {
-    if (!delState.id) return;
-    const next = comments.filter((c) => c.id !== delState.id);
-    setComments(next);
-    setDelState({ id: null, anchor: null });
-    onSaveComments?.(next);
-  }
-
-  // helper: izaberi stabilan anchor dok je popover otvoren (fallback na toolbar ako plus ne postoji)
-  const labelsAnchorRef = (labelsAnchor === "plus" && labelsPlusBtnRef.current)
-    ? labelsPlusBtnRef
-    : labelsToolbarBtnRef;
 
   return (
     <div ref={overlayRef} className="fixed inset-0 z-50 bg-black/40 p-6" aria-modal="true" role="dialog">
@@ -218,16 +200,18 @@ export default function CardDialog({
         "
         style={{ maxHeight: "80vh", overflow: "hidden" }}
       >
-        {/* Header sa kratkim progress-om u pilu (centriran uz breadcrumb) */}
+        {/* Header */}
         <div className="lg:col-span-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="text-xs text-zinc-500">
               {listTitle} <span className="mx-1">/</span> <span className="font-medium text-zinc-700">Card</span>
             </div>
             {sums.total > 0 && (
-              <div className="hidden md:flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1">
+              <div className={`hidden md:flex items-center gap-2 rounded-full border px-3 py-1
+                  ${allDone ? "border-green-300 bg-green-50" : "border-zinc-200 bg-zinc-50"}`}>
                 <div className="w-24"><ProgressBar value={pctAll} /></div>
-                <span className="text-xs text-zinc-600">{pctAll}%</span>
+                <span className={`text-xs ${allDone ? "text-green-700" : "text-zinc-600"}`}>{pctAll}%</span>
+                {allDone && <span className="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">Complete</span>}
               </div>
             )}
           </div>
@@ -243,7 +227,7 @@ export default function CardDialog({
 
         {/* LEFT */}
         <div className="min-h-0 overflow-y-auto pr-2 pb-6 space-y-5">
-          {/* Naslov */}
+          {/* Title */}
           <input
             value={title}
             onChange={(e) => setTitle(e.currentTarget.value)}
@@ -264,7 +248,7 @@ export default function CardDialog({
             <ToolbarButton ref={membersBtnRef} icon={<Users className="h-4 w-4" />} label="Members" onClick={() => setMembersOpen(true)} />
           </div>
 
-          {/* Labels + Due u istom redu; bez “Edit”, samo plusić */}
+          {/* Labels + Due */}
           {(selectedLabels.length > 0 || due) && (
             <CardSection title="Labels">
               <div className="flex flex-wrap items-center gap-2">
@@ -278,7 +262,6 @@ export default function CardDialog({
                   </span>
                 ))}
 
-                {/* PLUS za labele – inline uz bedževe */}
                 <button
                   ref={labelsPlusBtnRef}
                   onClick={() => { setLabelsAnchor("plus"); setLabelsOpen(true); }}
@@ -316,10 +299,7 @@ export default function CardDialog({
             right={
               !editingDesc ? (
                 <button
-                  onClick={() => {
-                    setEditingDesc(true);
-                    setDescDraft(desc);
-                  }}
+                  onClick={() => { setEditingDesc(true); setDescDraft(desc); }}
                   className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 cursor-pointer"
                   type="button"
                 >
@@ -335,10 +315,7 @@ export default function CardDialog({
                 </div>
               ) : (
                 <button
-                  onClick={() => {
-                    setEditingDesc(true);
-                    setDescDraft("");
-                  }}
+                  onClick={() => { setEditingDesc(true); setDescDraft(""); }}
                   className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-[15px] text-zinc-500 hover:bg-zinc-50 cursor-pointer"
                   type="button"
                 >
@@ -354,14 +331,7 @@ export default function CardDialog({
                   className="w-full h-40 resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[15px] text-zinc-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                 />
                 <div className="mt-2 flex items-center gap-2">
-                  <Button
-                    onClick={() => {
-                      setDesc(descDraft);
-                      onSaveDescription?.(descDraft);
-                      setEditingDesc(false);
-                    }}
-                    className="cursor-pointer"
-                  >
+                  <Button onClick={() => { setDesc(descDraft); onSaveDescription?.(descDraft); setEditingDesc(false); }} className="cursor-pointer">
                     Save
                   </Button>
                   <Button variant="ghost" onClick={() => { setDescDraft(desc); setEditingDesc(false); }} className="cursor-pointer">
@@ -394,10 +364,15 @@ export default function CardDialog({
                     </button>
                     <button
                       className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 cursor-pointer"
-                      onClick={() => {
-                        const next = lists.filter((x) => x.id !== cl.id);
-                        setLists(next);
-                        onSaveChecklists?.(next.length ? next : undefined);
+                      onClick={async () => {
+                        try {
+                          await apiDeleteChecklist(cl.id);
+                          const next = lists.filter((x) => x.id !== cl.id);
+                          setLists(next);
+                          onSaveChecklists?.(next.length ? next : undefined);
+                        } catch (e) {
+                          console.error("delete checklist failed", e);
+                        }
                       }}
                       type="button"
                     >
@@ -406,7 +381,7 @@ export default function CardDialog({
                   </div>
                 }
               >
-                <div className="mb-2 text-xs text-zinc-600">{Math.round(pct)}%</div>
+                <div className={`mb-2 text-xs ${pct === 100 ? "text-green-700" : "text-zinc-600"}`}>{Math.round(pct)}%</div>
                 <ProgressBar value={pct} />
                 <div className="mt-3 space-y-1">
                   {(hide ? cl.items.filter((i) => !i.done) : cl.items).map((it, i) => (
@@ -414,12 +389,18 @@ export default function CardDialog({
                       <input
                         type="checkbox"
                         checked={it.done}
-                        onChange={(e) => {
-                          const next = lists.map((l) =>
-                            l.id === cl.id ? { ...l, items: l.items.map((x, ii) => (ii === i ? { ...x, done: e.currentTarget.checked } : x)) } : l
-                          );
-                          setLists(next);
-                          onSaveChecklists?.(next);
+                        onChange={async (e) => {
+                          const checked = e.currentTarget.checked;
+                          try {
+                            await apiUpdateChecklistItem(it.id, { done: checked });
+                            const next = lists.map((l) =>
+                              l.id === cl.id ? { ...l, items: l.items.map((x, ii) => (ii === i ? { ...x, done: checked } : x)) } : l
+                            );
+                            setLists(next);
+                            onSaveChecklists?.(next);
+                          } catch (err) {
+                            console.error("update checklist item failed", err);
+                          }
                         }}
                       />
                       <span className={it.done ? "line-through text-zinc-400" : ""}>{it.text}</span>
@@ -430,15 +411,20 @@ export default function CardDialog({
                   <input
                     placeholder="Add an item"
                     className="flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm outline-none focus:border-cyan-500"
-                    onKeyDown={(e) => {
+                    onKeyDown={async (e) => {
                       const target = e.currentTarget as HTMLInputElement;
                       if (e.key === "Enter" && target.value.trim()) {
-                        const next = lists.map((l) =>
-                          l.id === cl.id ? { ...l, items: [...l.items, { id: crypto.randomUUID(), text: target.value.trim(), done: false }] } : l
-                        );
-                        setLists(next);
-                        onSaveChecklists?.(next);
-                        target.value = "";
+                        try {
+                          const item = await apiAddChecklistItem(cl.id, target.value.trim());
+                          const next = lists.map((l) =>
+                            l.id === cl.id ? { ...l, items: [...l.items, item] } : l
+                          );
+                          setLists(next);
+                          onSaveChecklists?.(next);
+                          target.value = "";
+                        } catch (err) {
+                          console.error("add checklist item failed", err);
+                        }
                       }
                     }}
                   />
@@ -470,6 +456,7 @@ export default function CardDialog({
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 space-y-4">
             {comments.map((c) => {
               const isEditing = editingCommentId === c.id;
+              const canEdit = c.author === currentUserName;
               return (
                 <div key={c.id} className="flex items-start gap-2">
                   <div className="mt-0.5 inline-grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#7C3AED] text-[11px] font-semibold text-white">
@@ -478,10 +465,9 @@ export default function CardDialog({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <div className="text-sm font-medium text-zinc-800">{c.author}</div>
-                      <span className="text-xs text-zinc-500">just now</span>
+                      <span className="text-xs text-zinc-500">{fmtDateTime(c.createdAt)}</span>
                     </div>
 
-                    {/* Text ili editor */}
                     {!isEditing ? (
                       <div className="mt-0.5 text-sm text-zinc-800 whitespace-pre-wrap">{c.text}</div>
                     ) : (
@@ -492,17 +478,31 @@ export default function CardDialog({
                           className="w-full h-24 resize-none rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                         />
                         <div className="mt-1 flex items-center gap-2">
-                          <Button onClick={() => saveEditComment(c.id)} className="h-8 px-3 cursor-pointer">Save</Button>
-                          <Button variant="ghost" onClick={cancelEditComment} className="h-8 px-3 cursor-pointer">Cancel</Button>
+                          <Button
+                            onClick={() => {
+                              const trimmed = commentDraft.trim();
+                              if (!trimmed) return;
+                              const next = comments.map((ci) => (ci.id === c.id ? { ...ci, text: trimmed } : ci));
+                              setComments(next);
+                              setEditingCommentId(null);
+                              setCommentDraft("");
+                              onSaveComments?.(next);
+                            }}
+                            className="h-8 px-3 cursor-pointer"
+                          >
+                            Save
+                          </Button>
+                          <Button variant="ghost" onClick={() => { setEditingCommentId(null); setCommentDraft(""); }} className="h-8 px-3 cursor-pointer">
+                            Cancel
+                          </Button>
                         </div>
                       </div>
                     )}
 
-                    {/* actions */}
-                    {!isEditing && (
+                    {!isEditing && canEdit && (
                       <div className="mt-1 flex items-center gap-2 text-xs text-zinc-600">
                         <button
-                          onClick={() => startEditComment(c.id, c.text)}
+                          onClick={() => { setEditingCommentId(c.id); setCommentDraft(c.text); }}
                           className="hover:underline text-zinc-700 cursor-pointer"
                           type="button"
                           title="Edit comment"
@@ -511,11 +511,7 @@ export default function CardDialog({
                         </button>
                         <span>•</span>
                         <button
-                          ref={() => {
-                            // just to keep ref available when needed
-                            /* no-op: anchor is passed at click time */
-                          }}
-                          onClick={(e) => askDeleteComment(c.id, e.currentTarget as HTMLElement)}
+                          onClick={(e) => setDelState({ id: c.id, anchor: e.currentTarget as HTMLElement })}
                           className="hover:underline text-rose-600 cursor-pointer"
                           type="button"
                           title="Delete comment"
@@ -524,8 +520,6 @@ export default function CardDialog({
                         </button>
                       </div>
                     )}
-
-                    <div className="mt-0.5 text-[11px] text-zinc-500">{fmtDateTime(c.createdAt)}</div>
                   </div>
                 </div>
               );
@@ -536,28 +530,41 @@ export default function CardDialog({
         {/* Popovers */}
         <LabelsPopover
           open={labelsOpen}
-          anchorRef={labelsAnchorRef}
+          anchorEl={labelsAnchorEl}
           onClose={() => {
             setLabelsOpen(false);
-            onSaveLabels?.(labels.filter((l) => l.checked));
+            onSaveLabels?.(selectedLabels);
           }}
-          labels={labels}
-          onToggle={(id) => setLabels((prev) => prev.map((l) => (l.id === id ? { ...l, checked: !l.checked } : l)))}
-          onCreate={(lbl) => {
-            setLabels((prev) => {
-              const map = new Map(prev.map((p) => [p.id, p]));
-              map.set(lbl.id, lbl);
-              return Array.from(map.values());
-            });
-            onSaveLabels?.(labels.filter((l) => l.checked));
+          labels={labelsLocal}
+          onToggle={(id: number) =>
+            setLabelsLocal((prev) => prev.map((l) => (l.id === id ? { ...l, checked: !l.checked } : l)))
+          }
+          onCreate={async ({ name, color }) => {
+            try {
+              const saved = await apiCreateLabel(boardId, { name, color });
+              onLabelsCatalogChange([...labelsCatalog, saved]);           // board katalog
+              setLabelsLocal((prev) => [...prev, { ...saved, checked: true }]); // lokalno + čekiraj
+            } catch (e) {
+              console.error("create label failed", e);
+            }
           }}
-          onUpdate={(lbl) => {
-            setLabels((prev) => prev.map((p) => (p.id === lbl.id ? { ...p, name: lbl.name, color: lbl.color } : p)));
-            onSaveLabels?.(labels.filter((l) => l.checked));
+          onUpdate={async ({ id, name, color }) => {
+            try {
+              const saved = await apiUpdateLabel(id, { name, color });
+              onLabelsCatalogChange(labelsCatalog.map((p) => (p.id === id ? { ...p, name: saved.name, color: saved.color } : p)));
+              setLabelsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, name: saved.name, color: saved.color } : p)));
+            } catch (e) {
+              console.error("update label failed", e);
+            }
           }}
-          onDelete={(id) => {
-            setLabels((prev) => prev.filter((p) => p.id !== id));
-            onSaveLabels?.(labels.filter((l) => l.checked));
+          onDelete={async (id: number) => {
+            try {
+              await apiDeleteLabel(id);
+              onLabelsCatalogChange(labelsCatalog.filter((p) => p.id !== id));
+              setLabelsLocal((prev) => prev.filter((p) => p.id !== id));
+            } catch (e) {
+              console.error("delete label failed", e);
+            }
           }}
         />
 
@@ -578,12 +585,16 @@ export default function CardDialog({
           open={checklistOpen}
           anchorRef={checklistBtnRef}
           onClose={() => setChecklistOpen(false)}
-          onSave={(t) => {
-            const created: Checklist = { id: crypto.randomUUID(), title: t, items: [] };
-            const next = [...lists, created];
-            setLists(next);
-            onSaveChecklists?.(next);
-            setChecklistOpen(false);
+          onSave={async (t: string) => {
+            try {
+              const created = await apiCreateChecklist(card.id, t);
+              const next = [...lists, created];
+              setLists(next);
+              onSaveChecklists?.(next);
+              setChecklistOpen(false);
+            } catch (e) {
+              console.error("create checklist failed", e);
+            }
           }}
         />
 
@@ -591,19 +602,11 @@ export default function CardDialog({
           open={membersOpen}
           anchorRef={membersBtnRef}
           onClose={() => setMembersOpen(false)}
-          team={[
-            { id: "u1", name: "Marko Marić" },
-            { id: "u2", name: "Jelena Jelić" },
-            { id: "u3", name: "Milan Nikolić" },
-          ]}
+          teamId={boardTeamId}
           initialSelected={members.map((m) => m.id)}
-          onSave={(ids) => {
-            const lookup = new Map<string, string>([
-              ["u1", "Marko Marić"],
-              ["u2", "Jelena Jelić"],
-              ["u3", "Milan Nikolić"],
-            ]);
-            const mapped: Member[] = ids.map((id) => ({ id, fullName: lookup.get(id) ?? id }));
+          onSave={(ids: Member["id"][], rows: { id: Member["id"]; name: string }[]) => {
+            const map = new Map<Member["id"], string>(rows.map((r) => [r.id, r.name]));
+            const mapped: Member[] = ids.map((id) => ({ id, display_name: map.get(id) ?? String(id) } as Member));
             setMembers(mapped);
             onSaveMembers?.(mapped);
           }}
@@ -614,7 +617,13 @@ export default function CardDialog({
           open={!!delState.id && !!delState.anchor}
           anchorEl={delState.anchor}
           onClose={() => setDelState({ id: null, anchor: null })}
-          onConfirm={confirmDeleteComment}
+          onConfirm={() => {
+            if (!delState.id) return;
+            const next = comments.filter((c) => c.id !== delState.id);
+            setComments(next);
+            setDelState({ id: null, anchor: null });
+            onSaveComments?.(next);
+          }}
         />
       </div>
     </div>
@@ -699,9 +708,7 @@ function CommentDeletePopover({
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="text-sm text-zinc-700">
-        Deleting a comment is forever. There is no undo.
-      </div>
+      <div className="text-sm text-zinc-700">Deleting a comment is forever. There is no undo.</div>
       <button
         onClick={() => { onConfirm(); onClose(); }}
         className="mt-3 w-full rounded-md bg-rose-500 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-600 cursor-pointer"

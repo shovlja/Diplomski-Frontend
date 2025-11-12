@@ -21,7 +21,7 @@ export type LabelItem = {
   
   export type Member = {
     id: string;
-    fullName: string;
+    display_name: string;
     avatarUrl?: string;
   };
   

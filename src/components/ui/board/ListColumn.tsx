@@ -154,7 +154,7 @@ export default function ListColumn({
           const isOverHere = overIndex != null && overIndex === idx;
           const isDragging = dragging?.cardId === c.id;
 
-          return (
+        return (
             <React.Fragment key={c.id}>
               {isOverHere && <DropHere height={dropHeight} />}
               <CardItem
