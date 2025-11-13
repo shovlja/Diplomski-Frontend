@@ -1,3 +1,140 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "@fontsource-variable/manrope";        
+@import "@fontsource-variable/plus-jakarta-sans";
+
+@import "tailwindcss";
+
+/* full-height i bez margine */
+@layer base {
+  :root {
+    --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  }
+  html, body, #root { height: 100%; }
+  body { margin: 0; font-family: var(--font-sans); } /* umesto @apply font-sans */
+}
+
+
+/* DEFAULT PALETA (ovde izaberi boje koje želiš kao podrazumevane) */
+:root {
+  /* Minimal: ocean (teal/blue) — promeni ako želiš npr. slate/violet */
+  --g1: #2DD4BF;
+  --g2: #22D3EE;
+  --g3: #60A5FA;
+  --accent-on-dark: #22D3EE;
+  --sonner-z-index: 9999;
+
+  /* default brzina i easing (možeš prepisati klasama) */
+  --grad-speed: 6s;
+  --grad-ease: cubic-bezier(.4,0,.2,1); /* snappy */
+}
+
+/* animacija gradijenta */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* utility za “živu” pozadinu */
+.bg-animated-gradient {
+  background-image: linear-gradient(135deg, var(--g1), var(--g2), var(--g3));
+  background-size: 220% 220%;
+  animation: gradient-shift var(--grad-speed) var(--grad-ease) infinite;
+  will-change: background-position;
+}
+
+/* brzina */
+.grad-fast   { --grad-speed: 2s; }
+.grad-normal { --grad-speed: 12s; }
+.grad-slow   { --grad-speed: 22s; }
+
+/* easing */
+.grad-linear       { --grad-ease: linear; }
+.grad-ease         { --grad-ease: ease; }
+.grad-ease-in      { --grad-ease: ease-in; }
+.grad-ease-out     { --grad-ease: ease-out; }
+.grad-ease-in-out  { --grad-ease: ease-in-out; }
+.grad-snappy       { --grad-ease: cubic-bezier(.4,0,.2,1); }
+.grad-bouncy       { --grad-ease: cubic-bezier(.22,1,.36,1); }
+
+/* I DALJE MOŽEŠ da koristiš palete po potrebi (prepisuju :root) */
+.grad-violet { --g1:#9F7AEA; --g2:#C4B5FD; --g3:#FDE1FF; }
+.grad-sky    { --g1:#38BDF8; --g2:#60A5FA; --g3:#A78BFA; }
+.grad-ocean  { --g1:#2DD4BF; --g2:#22D3EE; --g3:#60A5FA; }
+.grad-forest { --g1:#34D399; --g2:#10B981; --g3:#22C55E; }
+.grad-sunset { --g1:#FB923C; --g2:#F472B6; --g3:#A78BFA; }
+.grad-rose   { --g1:#FB7185; --g2:#F472B6; --g3:#F9A8D4; }
+.grad-mango  { --g1:#FDE68A; --g2:#FCA5A5; --g3:#FDBA74; }
+.grad-slate  { --g1:#94A3B8; --g2:#CBD5E1; --g3:#E5E7EB; }
+.grad-neon   { --g1:#22D3EE; --g2:#A78BFA; --g3:#F472B6; }
+.grad-midnight { --g1:#0EA5E9; --g2:#6366F1; --g3:#111827; }
+
+/* accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .bg-animated-gradient { animation: none; }
+}
+
+@property --g1  { syntax: '<color>'; inherits: false; initial-value: #9F7AEA; }
+@property --g2  { syntax: '<color>'; inherits: false; initial-value: #C4B5FD; }
+@property --g3  { syntax: '<color>'; inherits: false; initial-value: #FDE1FF; }
+@property --g1b { syntax: '<color>'; inherits: false; initial-value: #2DD4BF; }
+@property --g2b { syntax: '<color>'; inherits: false; initial-value: #22D3EE; }
+@property --g3b { syntax: '<color>'; inherits: false; initial-value: #60A5FA; }
+
+/* A→B→A crossfade, smer gradijenta ostaje isti */
+@keyframes gradient-xfade {
+  0%, 100% {
+    --g1: var(--g1a, var(--g1));
+    --g2: var(--g2a, var(--g2));
+    --g3: var(--g3a, var(--g3));
+  }
+  50% {
+    --g1: var(--g1b);
+    --g2: var(--g2b);
+    --g3: var(--g3b);
+  }
+}
+
+/* Nova util klasa (ne koristi poziciju pozadine) */
+.bg-animated-xfade {
+  background-image: linear-gradient(135deg, var(--g1), var(--g2), var(--g3));
+  background-size: 100% 100%;
+  animation: gradient-xfade var(--grad-speed, 12s) var(--grad-ease, ease-in-out) infinite;
+  will-change: background;
+}
+
+/* START palete (A) – početne boje */
+.grad-start-violet { --g1:#9F7AEA; --g2:#C4B5FD; --g3:#FDE1FF; }
+.grad-start-ocean  { --g1:#2DD4BF; --g2:#22D3EE; --g3:#60A5FA; }
+.grad-start-slate  { --g1:#94A3B8; --g2:#CBD5E1; --g3:#E5E7EB; }
+.grad-start-sunset { --g1:#FB923C; --g2:#F472B6; --g3:#A78BFA; }
+
+/* END palete (B) – cilj na 50% animacije */
+.to-violet { --g1b:#9F7AEA; --g2b:#C4B5FD; --g3b:#FDE1FF; }
+.to-ocean  { --g1b:#2DD4BF; --g2b:#22D3EE; --g3b:#60A5FA; }
+.to-slate  { --g1b:#94A3B8; --g2b:#CBD5E1; --g3b:#E5E7EB; }
+.to-sunset { --g1b:#FB923C; --g2b:#F472B6; --g3b:#A78BFA; }
+
+/* Poštuj reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .bg-animated-xfade { animation: none; }
+}
+
+/* Trello-like horizontalni scrollbar samo za board scroller */
+.board-scroll {
+  scrollbar-color: rgba(120,130,140,0.65) transparent; /* Firefox */
+  scrollbar-width: thin;                               /* Firefox */
+}
+
+.board-scroll::-webkit-scrollbar {
+  height: 10px; /* visina trake pri dnu */
+}
+.board-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board-scroll::-webkit-scrollbar-thumb {
+  background: rgba(120,130,140,0.65);
+  border-radius: 9999px;
+}
+.board-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(120,130,140,0.85);
+}
